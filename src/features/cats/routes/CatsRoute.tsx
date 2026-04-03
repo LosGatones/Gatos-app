@@ -39,20 +39,20 @@ export function CatsRoute() {
   }
 
   return (
-    <section className="stack">
-      <div className="panel stack stack--compact">
+    <section className="page">
+      <div className="page-intro">
         <div>
           <h1>Gatos</h1>
           <p className="muted">Lista de gatos activos.</p>
         </div>
       </div>
 
-      <section className="panel stack stack--compact">
+      <section className="panel panel--subtle panel--section stack stack--compact">
         <div>
           <h2>Nuevo gato</h2>
           <p className="muted">Captura minima para empezar a registrar.</p>
         </div>
-        <form className="form" onSubmit={handleSubmit}>
+        <form className="form form--compact" onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="cat-name">Nombre</label>
             <input
@@ -84,24 +84,24 @@ export function CatsRoute() {
 
       <div className="stack">
         {catsQuery.isLoading ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="muted">Cargando gatos...</p>
           </div>
         ) : null}
         {catsQuery.isError ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="error">No fue posible cargar los gatos.</p>
           </div>
         ) : null}
         {!catsQuery.isLoading && !catsQuery.isError && !catsQuery.data?.length ? (
-          <div className="panel empty-state">
+          <div className="panel panel--subtle empty-state">
             <h2>No hay gatos activos</h2>
             <p className="muted">Cuando registres un gato, aparecera aqui.</p>
           </div>
         ) : null}
         {catsQuery.data?.map((cat) => (
-          <Link className="panel list-row" key={cat.id} to={`/cats/${cat.id}`}>
-            <div className="stack stack--compact">
+          <Link className="panel panel--subtle list-row list-card" key={cat.id} to={`/cats/${cat.id}`}>
+            <div className="list-card__content">
               <strong>{cat.name}</strong>
               <p className="muted clamp-two-lines">{cat.notes ?? "Sin notas."}</p>
             </div>

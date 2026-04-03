@@ -40,7 +40,8 @@ export function AppShell() {
   return (
     <div className="shell">
       <header className="shell__header">
-        <div>
+        <div className="shell__brand">
+          <span className="shell__eyebrow">Registro compartido</span>
           <div className="shell__title">Gatos App</div>
           <div className="muted">{profileQuery.data?.display_name ?? "Sesion"}</div>
         </div>

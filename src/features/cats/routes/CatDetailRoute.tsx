@@ -536,7 +536,7 @@ export function CatDetailRoute() {
 
   if (catDetailQuery.isLoading) {
     return (
-      <section className="stack">
+      <section className="page">
         <div className="panel">
           <p className="muted">Cargando detalle...</p>
         </div>
@@ -546,7 +546,7 @@ export function CatDetailRoute() {
 
   if (catDetailQuery.isError) {
     return (
-      <section className="stack">
+      <section className="page">
         <div className="panel">
           <p className="error">No fue posible cargar este gato.</p>
         </div>
@@ -556,7 +556,7 @@ export function CatDetailRoute() {
 
   if (!catDetailQuery.data) {
     return (
-      <section className="stack">
+      <section className="page">
         <div className="panel">
           <h1>Gato no encontrado</h1>
           <p className="muted">Este registro no existe o ya no esta disponible.</p>
@@ -571,14 +571,20 @@ export function CatDetailRoute() {
   const birthdayMetrics = getBirthdayMetrics(cat.birth_date);
 
   return (
-    <section className="stack">
-      <div className="panel stack">
-        <div className="detail-header">
-          <div className="stack stack--compact">
+    <section className="page">
+      <div className="panel stack stack--airy surface-hero">
+        <div className="detail-header hero-card__top">
+          <div className="stack stack--compact hero-card__title">
             <Link className="back-link" to={isArchived ? "/archive" : "/cats"}>
               Volver
             </Link>
+            <span className="eyebrow">Detalle del gato</span>
             <h1>{cat.name}</h1>
+            <p className="muted">
+              {isArchived
+                ? "Registro en consulta. La captura queda bloqueada hasta reactivarlo."
+                : "Perfil, timeline y seguimiento general en una sola vista."}
+            </p>
           </div>
           <span className={`status ${isArchived ? "status--neutral" : ""}`}>
             {isArchived ? "Archivado" : "Activo"}
@@ -586,9 +592,9 @@ export function CatDetailRoute() {
         </div>
 
         <div className="detail-grid">
-          <div className="stack">
-            <section className="panel panel--subtle stack stack--compact">
-              <div className="section-header">
+          <div className="surface-group">
+            <section className="panel panel--subtle panel--section stack stack--compact">
+              <div className="section-header form-card__head">
                 <div>
                   <h2>Datos del gato</h2>
                   <p className="muted">
@@ -608,7 +614,7 @@ export function CatDetailRoute() {
                       : "Archivar"}
                 </button>
               </div>
-              <form className="form" onSubmit={handleCatSubmit}>
+              <form className="form form--compact" onSubmit={handleCatSubmit}>
                 <div className="field">
                   <label htmlFor="detail-name">Nombre</label>
                   <input
@@ -670,8 +676,8 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="panel panel--subtle stack stack--compact">
-              <div className="section-header">
+            <section className="panel panel--subtle panel--section stack stack--compact">
+              <div className="section-header form-card__head">
                 <div>
                   <h2>Nuevo proceso clinico</h2>
                   <p className="muted">
@@ -682,9 +688,10 @@ export function CatDetailRoute() {
                 </div>
               </div>
 
-              <form className="form" onSubmit={handleProcessSubmit}>
-                <div className="field">
-                  <label htmlFor="process-type">Tipo de proceso</label>
+              <form className="form form--compact" onSubmit={handleProcessSubmit}>
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="process-type">Tipo de proceso</label>
                   <select
                     id="process-type"
                     value={processTypeId}
@@ -699,6 +706,18 @@ export function CatDetailRoute() {
                       </option>
                     ))}
                   </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="process-opened-at">Fecha de apertura</label>
+                    <input
+                      id="process-opened-at"
+                      type="datetime-local"
+                      value={processOpenedAt}
+                      onChange={(event) => setProcessOpenedAt(event.target.value)}
+                      disabled={isArchived || createProcessMutation.isPending}
+                      required
+                    />
+                  </div>
                 </div>
                 {!activeProcessTypes.length ? (
                   <p className="muted">
@@ -711,18 +730,6 @@ export function CatDetailRoute() {
                     id="process-title"
                     value={processTitle}
                     onChange={(event) => setProcessTitle(event.target.value)}
-                    disabled={isArchived || createProcessMutation.isPending}
-                    required
-                  />
-                </div>
-
-                <div className="field">
-                  <label htmlFor="process-opened-at">Fecha de apertura</label>
-                  <input
-                    id="process-opened-at"
-                    type="datetime-local"
-                    value={processOpenedAt}
-                    onChange={(event) => setProcessOpenedAt(event.target.value)}
                     disabled={isArchived || createProcessMutation.isPending}
                     required
                   />
@@ -754,8 +761,8 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="panel panel--subtle stack stack--compact">
-              <div className="section-header">
+            <section className="panel panel--subtle panel--section stack stack--compact">
+              <div className="section-header form-card__head">
                 <div>
                   <h2>Nuevo evento</h2>
                   <p className="muted">
@@ -766,7 +773,7 @@ export function CatDetailRoute() {
                 </div>
               </div>
 
-              <form className="form" onSubmit={handleEventSubmit}>
+              <form className="form form--compact" onSubmit={handleEventSubmit}>
                 <div className="field">
                   <label htmlFor="event-title">Titulo</label>
                   <input
@@ -789,36 +796,38 @@ export function CatDetailRoute() {
                   />
                 </div>
 
-                <div className="field">
-                  <label htmlFor="event-at">Fecha y hora</label>
-                  <input
-                    id="event-at"
-                    type="datetime-local"
-                    value={eventAt}
-                    onChange={(event) => setEventAt(event.target.value)}
-                    disabled={isArchived || createEventMutation.isPending}
-                    required
-                  />
-                </div>
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="event-at">Fecha y hora</label>
+                    <input
+                      id="event-at"
+                      type="datetime-local"
+                      value={eventAt}
+                      onChange={(event) => setEventAt(event.target.value)}
+                      disabled={isArchived || createEventMutation.isPending}
+                      required
+                    />
+                  </div>
 
-                <div className="field">
-                  <label htmlFor="event-category">Categoria</label>
-                  <select
-                    id="event-category"
-                    value={categoryId}
-                    onChange={(event) => {
-                      setCategoryId(event.target.value);
-                      setSubcategoryId("");
-                    }}
-                    disabled={isArchived || createEventMutation.isPending}
-                  >
-                    <option value="">Sin categoria</option>
-                    {(categoriesQuery.data ?? []).map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="field">
+                    <label htmlFor="event-category">Categoria</label>
+                    <select
+                      id="event-category"
+                      value={categoryId}
+                      onChange={(event) => {
+                        setCategoryId(event.target.value);
+                        setSubcategoryId("");
+                      }}
+                      disabled={isArchived || createEventMutation.isPending}
+                    >
+                      <option value="">Sin categoria</option>
+                      {(categoriesQuery.data ?? []).map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="field">
@@ -843,8 +852,10 @@ export function CatDetailRoute() {
                   </select>
                 </div>
 
-                <fieldset className="field" disabled={isArchived || createEventMutation.isPending}>
-                  <legend>Tambien afecta a</legend>
+                <fieldset className="fieldset" disabled={isArchived || createEventMutation.isPending}>
+                  <div className="field">
+                    <legend>Tambien afecta a</legend>
+                  </div>
                   {!relatedCatOptions.length ? (
                     <p className="muted">No hay otros gatos activos para relacionar.</p>
                   ) : (
@@ -869,7 +880,7 @@ export function CatDetailRoute() {
                   )}
                 </fieldset>
 
-                <section className="stack stack--compact">
+                <section className="cost-box">
                   <div className="section-header section-header--compact">
                     <div>
                       <strong>Costo</strong>
@@ -957,8 +968,11 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="stack stack--compact">
-              <h2>Timeline</h2>
+            <section className="section-shell">
+              <div className="section-shell__head">
+                <span className="eyebrow">Historial</span>
+                <h2>Timeline</h2>
+              </div>
               {!cat.timeline.length ? (
                 <div className="panel panel--subtle empty-state empty-state--tight">
                   <p className="muted">Todavia no hay eventos para este gato.</p>
@@ -981,7 +995,7 @@ export function CatDetailRoute() {
                           <span>{formatDate(item.event_at)}</span>
                         </div>
                         <div className="timeline__header">
-                          <div className="stack stack--compact">
+                          <div className="timeline__body">
                             {item.is_process_header ? (
                               <span className="process-badge">Proceso clinico</span>
                             ) : null}
@@ -1133,7 +1147,7 @@ export function CatDetailRoute() {
             </section>
           </div>
 
-          <aside className="stack">
+          <aside className="aside-stack">
             {showCostTotal ? (
               <section className="panel panel--subtle cost-total-card">
                 <p className="cost-total-card__label">Acumulado</p>
@@ -1141,7 +1155,7 @@ export function CatDetailRoute() {
               </section>
             ) : null}
 
-            <section className="panel panel--subtle stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact">
               <div>
                 <h2>Foto principal</h2>
                 <p className="muted">
@@ -1165,7 +1179,7 @@ export function CatDetailRoute() {
                   <p className="muted">No hay foto principal disponible.</p>
                 </div>
               )}
-              <form className="form" onSubmit={handlePrimaryPhotoSubmit}>
+              <form className="form form--compact" onSubmit={handlePrimaryPhotoSubmit}>
                 <div className="field">
                   <label htmlFor="cat-primary-photo">
                     {cat.primary_photo ? "Reemplazar foto principal" : "Subir foto principal"}
@@ -1195,7 +1209,7 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="panel panel--subtle stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact">
               <div>
                 <h2>Adjuntos</h2>
                 <p className="muted">
@@ -1204,7 +1218,7 @@ export function CatDetailRoute() {
                     : "Archivos e imagenes generales ligados a este gato."}
                 </p>
               </div>
-              <form className="form" onSubmit={handleAttachmentSubmit}>
+              <form className="form form--compact" onSubmit={handleAttachmentSubmit}>
                 <div className="field">
                   <label htmlFor="cat-attachment">Agregar adjunto</label>
                   <input

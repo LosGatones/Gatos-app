@@ -276,7 +276,7 @@ export function ProcessDetailRoute() {
 
   if (processQuery.isLoading) {
     return (
-      <section className="stack">
+      <section className="page">
         <div className="panel">
           <p className="muted">Cargando seguimiento...</p>
         </div>
@@ -286,7 +286,7 @@ export function ProcessDetailRoute() {
 
   if (processQuery.isError) {
     return (
-      <section className="stack">
+      <section className="page">
         <div className="panel">
           <p className="error">No fue posible cargar este proceso.</p>
         </div>
@@ -303,13 +303,14 @@ export function ProcessDetailRoute() {
   const isClosed = Boolean(process.closed_at);
 
   return (
-    <section className="stack">
-      <div className="panel stack">
+    <section className="page">
+      <div className="panel stack stack--airy surface-hero">
         <div className="process-header">
-          <div className="stack stack--compact">
+          <div className="stack stack--compact hero-card__title">
             <Link className="back-link" to={`/cats/${process.cat.id}`}>
               Volver a {process.cat.name}
             </Link>
+            <span className="eyebrow">Seguimiento clinico</span>
             <span className="process-badge">Proceso clinico</span>
             <h1>{process.title}</h1>
             <div className="process-summary">
@@ -341,20 +342,20 @@ export function ProcessDetailRoute() {
         </div>
 
         {process.notes ? (
-          <section className="panel panel--subtle">
+          <section className="panel panel--subtle panel--section">
             <p>{process.notes}</p>
           </section>
         ) : null}
 
         {closeFormVisible ? (
-          <section className="panel panel--subtle stack stack--compact">
+          <section className="panel panel--subtle panel--section stack stack--compact">
             <div className="section-header">
               <div>
                 <h2>Cerrar proceso</h2>
                 <p className="muted">Se registrará un evento final de cierre o alta.</p>
               </div>
             </div>
-            <form className="form" onSubmit={handleCloseSubmit}>
+            <form className="form form--compact" onSubmit={handleCloseSubmit}>
               <div className="field">
                 <label htmlFor="process-close-title">Título final</label>
                 <input
@@ -396,7 +397,7 @@ export function ProcessDetailRoute() {
           </section>
         ) : null}
 
-        <section className="panel panel--subtle stack stack--compact">
+          <section className="panel panel--subtle panel--section stack stack--compact">
           <div className="section-header">
             <div>
               <h2>Nuevo registro</h2>
@@ -410,9 +411,10 @@ export function ProcessDetailRoute() {
             </div>
           </div>
 
-          <form className="form" onSubmit={handleSubmit}>
-            <div className="field">
-              <label htmlFor="process-event-kind">Tipo</label>
+          <form className="form form--compact" onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="process-event-kind">Tipo</label>
               <select
                 id="process-event-kind"
                 value={kind}
@@ -425,6 +427,19 @@ export function ProcessDetailRoute() {
                 <option value="dieta">Dieta</option>
                 <option value="nota">Nota</option>
               </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="process-event-at">Fecha y hora</label>
+                <input
+                  id="process-event-at"
+                  type="datetime-local"
+                  value={eventAt}
+                  onChange={(event) => setEventAt(event.target.value)}
+                  disabled={isArchived || isClosed || createProcessEventMutation.isPending}
+                  required
+                />
+              </div>
             </div>
 
             <div className="field">
@@ -433,18 +448,6 @@ export function ProcessDetailRoute() {
                 id="process-event-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                disabled={isArchived || isClosed || createProcessEventMutation.isPending}
-                required
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="process-event-at">Fecha y hora</label>
-              <input
-                id="process-event-at"
-                type="datetime-local"
-                value={eventAt}
-                onChange={(event) => setEventAt(event.target.value)}
                 disabled={isArchived || isClosed || createProcessEventMutation.isPending}
                 required
               />
@@ -461,7 +464,7 @@ export function ProcessDetailRoute() {
               />
             </div>
 
-            <section className="stack stack--compact">
+            <section className="cost-box">
               <div className="section-header section-header--compact">
                 <div>
                   <strong>Costo</strong>
@@ -538,8 +541,11 @@ export function ProcessDetailRoute() {
           </form>
         </section>
 
-        <section className="stack stack--compact">
-          <h2>Subtimeline</h2>
+        <section className="section-shell">
+          <div className="section-shell__head">
+            <span className="eyebrow">Historial</span>
+            <h2>Subtimeline</h2>
+          </div>
           {!process.timeline.length ? (
             <div className="panel panel--subtle empty-state empty-state--tight">
               <p className="muted">Todavia no hay registros en este proceso.</p>
@@ -562,7 +568,7 @@ export function ProcessDetailRoute() {
                       <span>{formatDate(item.event_at)}</span>
                     </div>
                     <div className="timeline__header">
-                      <div className="stack stack--compact">
+                      <div className="timeline__body">
                         {item.is_process_header ? (
                           <span className="process-badge">Inicio del seguimiento</span>
                         ) : kindLabel ? (

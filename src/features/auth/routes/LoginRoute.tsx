@@ -57,13 +57,14 @@ export function LoginRoute() {
   );
 
   return (
-    <main className="shell__main">
-      <section className="panel stack">
+    <main className="shell__main login-shell">
+      <section className="panel login-card stack surface-hero">
         <div>
+          <span className="eyebrow">Acceso privado</span>
           <h1>Acceso</h1>
           <p className="muted">Ingresa con tu cuenta autorizada.</p>
         </div>
-        <form className="form" onSubmit={handleSubmit}>
+        <form className="form form--compact" onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="email">Correo</label>
             <input

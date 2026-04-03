@@ -147,8 +147,8 @@ export function CategoriesRoute() {
   }
 
   return (
-    <section className="stack">
-      <div className="panel stack stack--compact">
+    <section className="page">
+      <div className="page-intro">
         <div>
           <h1>Catalogos</h1>
           <p className="muted">Categorias de eventos y tipos de procesos clinicos editables.</p>
@@ -156,12 +156,12 @@ export function CategoriesRoute() {
       </div>
 
       <div className="two-column">
-        <section className="panel stack stack--compact">
+        <section className="panel panel--subtle panel--section stack stack--compact">
           <div>
             <h2>Nueva categoria</h2>
             <p className="muted">Si no existe ninguna, puedes crear la primera aqui.</p>
           </div>
-          <form className="form" onSubmit={handleCategorySubmit}>
+          <form className="form form--compact" onSubmit={handleCategorySubmit}>
             <div className="field">
               <label htmlFor="category-label">Nombre</label>
               <input
@@ -189,12 +189,12 @@ export function CategoriesRoute() {
           </form>
         </section>
 
-        <section className="panel stack stack--compact">
+        <section className="panel panel--subtle panel--section stack stack--compact">
           <div>
             <h2>Nueva subcategoria</h2>
             <p className="muted">Ligada a una categoria existente.</p>
           </div>
-          <form className="form" onSubmit={handleSubcategorySubmit}>
+          <form className="form form--compact" onSubmit={handleSubcategorySubmit}>
             <div className="field">
               <label htmlFor="subcategory-category">Categoria</label>
               <select
@@ -245,12 +245,12 @@ export function CategoriesRoute() {
       </div>
 
       <div className="two-column">
-        <section className="panel stack stack--compact">
+        <section className="panel panel--subtle panel--section stack stack--compact">
           <div>
             <h2>Nuevo tipo de proceso</h2>
             <p className="muted">Se usa para clasificar seguimientos clinicos.</p>
           </div>
-          <form className="form" onSubmit={handleProcessTypeSubmit}>
+          <form className="form form--compact" onSubmit={handleProcessTypeSubmit}>
             <div className="field">
               <label htmlFor="process-type-label">Nombre</label>
               <input
@@ -278,7 +278,7 @@ export function CategoriesRoute() {
           </form>
         </section>
 
-        <section className="panel stack stack--compact">
+        <section className="panel panel--subtle panel--section stack stack--compact">
           <div>
             <h2>Editar tipo</h2>
             <p className="muted">Puedes renombrar o activar e inactivar sin romper historial.</p>
@@ -288,7 +288,7 @@ export function CategoriesRoute() {
               <p className="muted">Elige un tipo de la lista para editarlo aqui.</p>
             </div>
           ) : (
-            <form className="form" onSubmit={handleProcessTypeUpdateSubmit}>
+            <form className="form form--compact" onSubmit={handleProcessTypeUpdateSubmit}>
               <div className="field">
                 <label htmlFor="process-type-edit-label">Nombre</label>
                 <input
@@ -321,17 +321,17 @@ export function CategoriesRoute() {
 
       <div className="stack">
         {processTypesQuery.isLoading ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="muted">Cargando tipos de proceso...</p>
           </div>
         ) : null}
         {processTypesQuery.isError ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="error">No fue posible cargar los tipos de proceso.</p>
           </div>
         ) : null}
         {processTypesQuery.data?.length ? (
-          <section className="panel stack stack--compact">
+          <section className="panel panel--subtle panel--section stack stack--compact">
             <div>
               <h2>Tipos de proceso</h2>
               <p className="muted">El selector de nuevos procesos solo muestra los que están activos.</p>
@@ -381,23 +381,23 @@ export function CategoriesRoute() {
 
       <div className="stack">
         {categoriesQuery.isLoading ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="muted">Cargando categorias...</p>
           </div>
         ) : null}
         {categoriesQuery.isError ? (
-          <div className="panel">
+          <div className="panel panel--subtle">
             <p className="error">No fue posible cargar las categorias.</p>
           </div>
         ) : null}
         {!categoriesQuery.isLoading && !categoriesQuery.isError && !categoriesQuery.data?.length ? (
-          <div className="panel empty-state">
+          <div className="panel panel--subtle empty-state">
             <h2>No hay categorias registradas</h2>
             <p className="muted">Cuando existan categorias y subcategorias, apareceran aqui.</p>
           </div>
         ) : null}
         {categoriesQuery.data?.map((category) => (
-          <article className="panel stack stack--compact" key={category.id}>
+          <article className="panel panel--subtle panel--section stack stack--compact" key={category.id}>
             <div className="category-header">
               <div>
                 <h2>{category.label}</h2>
