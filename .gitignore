@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.local
+coverage/
+.idea/
+.vscode/
+*.tsbuildinfo
+.supabase/
+vite.config.js
+vite.config.d.ts
