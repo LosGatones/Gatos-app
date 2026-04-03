@@ -299,6 +299,28 @@ button {
   grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.9fr);
 }
 
+.detail-facts {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail-fact {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(88, 58, 121, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.detail-fact__label {
+  color: rgba(60, 35, 85, 0.72);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .back-link,
 .inline-link {
   color: #583a79;
@@ -368,6 +390,13 @@ button {
   background: rgba(255, 255, 255, 0.68);
 }
 
+.timeline__item--process {
+  border-color: rgba(120, 72, 168, 0.26);
+  background:
+    linear-gradient(180deg, rgba(120, 72, 168, 0.1), rgba(255, 255, 255, 0.76)),
+    rgba(255, 255, 255, 0.76);
+}
+
 .timeline__item h3 {
   margin: 0 0 0.35rem;
 }
@@ -396,6 +425,54 @@ button {
   margin: 0.25rem 0 0.7rem;
   color: rgba(60, 35, 85, 0.9);
   font-size: 0.95rem;
+}
+
+.process-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.process-summary {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.process-summary p {
+  margin: 0;
+}
+
+.process-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.process-badge,
+.process-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.process-badge {
+  background: rgba(120, 72, 168, 0.14);
+  color: #583a79;
+}
+
+.process-chip {
+  background: rgba(252, 156, 6, 0.16);
+  color: #7a4a00;
+}
+
+.process-subtimeline .timeline__item {
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .cost-box,
@@ -442,6 +519,29 @@ button {
   background: rgba(120, 72, 168, 0.06);
 }
 
+.catalog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(88, 58, 121, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.catalog-row p {
+  margin: 0.2rem 0 0;
+}
+
+.catalog-row__actions {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 @media (max-width: 640px) {
   .shell__header {
     align-items: flex-start;
@@ -466,7 +566,15 @@ button {
 
   .detail-grid,
   .two-column,
-  .field-group {
+  .field-group,
+  .detail-facts {
     grid-template-columns: 1fr;
+  }
+
+  .process-actions,
+  .catalog-row,
+  .catalog-row__actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

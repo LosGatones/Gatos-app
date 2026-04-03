@@ -1,11 +1,16 @@
 import type {
   CatAttachment,
   Cat,
+  ClinicalProcessType,
+  ClinicalProcess,
+  ClinicalProcessDetail,
   EventCostSummary,
   CatPhoto,
   CatTimelineItem,
   EventCategory,
   EventSubcategory,
+  ProcessEventKind,
+  ProcessTimelineItem,
   Profile,
 } from "@/domain/types";
 
@@ -55,6 +60,38 @@ function mapEventCostSummary(
   };
 }
 
+function parseProcessEventNotes(value: unknown): {
+  notes: string | null;
+  kind: ProcessEventKind | null;
+} {
+  const rawValue = value ? String(value) : "";
+  const match = rawValue.match(
+    /^kind:(consulta|estudio|medicamento|dieta|nota)(?:\r?\n\r?\n?([\s\S]*))?$/i,
+  );
+
+  if (!match) {
+    return {
+      notes: rawValue || null,
+      kind: null,
+    };
+  }
+
+  const normalizedKind = match[1]?.toLowerCase();
+  const cleanedNotes = match[2]?.trim() || null;
+
+  return {
+    notes: cleanedNotes,
+    kind:
+      normalizedKind === "consulta" ||
+      normalizedKind === "estudio" ||
+      normalizedKind === "medicamento" ||
+      normalizedKind === "dieta" ||
+      normalizedKind === "nota"
+        ? normalizedKind
+        : null,
+  };
+}
+
 export function mapProfileRow(row: Record<string, unknown>): Profile {
   return {
     id: String(row.id),
@@ -68,6 +105,7 @@ export function mapCatRow(row: Record<string, unknown>): Cat {
     id: String(row.id),
     name: String(row.name),
     notes: row.notes ? String(row.notes) : null,
+    birth_date: row.birth_date ? String(row.birth_date) : null,
     archived_at: row.archived_at ? String(row.archived_at) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -124,23 +162,96 @@ export function mapCatTimelineRow(
   const process = pickSingleRelation(
     row.process as Record<string, unknown> | Array<Record<string, unknown>> | null,
   );
+  const processType = pickSingleRelation(
+    (process?.process_type as Record<string, unknown> | Array<Record<string, unknown>> | null) ??
+      null,
+  );
+  const parsedProcessNotes = parseProcessEventNotes(row.notes);
+  const processOpenedAt = process?.opened_at ? String(process.opened_at) : null;
+  const processClosedAt = process?.closed_at ? String(process.closed_at) : null;
+  const processCreatedAt = process?.created_at ? String(process.created_at) : null;
+  const eventAt = String(row.event_at);
+  const createdAt = String(row.created_at);
 
   return {
     id: String(row.id),
     title: String(row.title),
-    notes: row.notes ? String(row.notes) : null,
+    notes: parsedProcessNotes.notes,
     time_kind: row.time_kind === "scheduled" ? "scheduled" : "occurred",
-    event_at: String(row.event_at),
-    created_at: String(row.created_at),
+    event_at: eventAt,
+    created_at: createdAt,
     category_label: category?.label ? String(category.label) : null,
     subcategory_label: subcategory?.label ? String(subcategory.label) : null,
     process_id: process?.id ? String(process.id) : null,
     process_title: process?.title ? String(process.title) : null,
+    process_type_label: processType?.label ? String(processType.label) : null,
+    process_opened_at: processOpenedAt,
+    process_closed_at: processClosedAt,
+    process_closed_event_id: process?.closed_event_id ? String(process.closed_event_id) : null,
+    process_created_at: processCreatedAt,
+    is_process_header:
+      Boolean(process?.id) && processOpenedAt === eventAt && processCreatedAt === createdAt,
+    process_event_kind: parsedProcessNotes.kind,
     cost: mapEventCostSummary(
       row.event_costs as Record<string, unknown> | Array<Record<string, unknown>> | null,
       row.event_cat_costs,
       currentCatId,
     ),
+  };
+}
+
+export function mapClinicalProcessRow(row: Record<string, unknown>): ClinicalProcess {
+  const processType = pickSingleRelation(
+    row.process_type as Record<string, unknown> | Array<Record<string, unknown>> | null,
+  );
+
+  return {
+    id: String(row.id),
+    cat_id: String(row.cat_id),
+    process_type_id: String(row.process_type_id),
+    process_type_label: processType?.label ? String(processType.label) : null,
+    title: String(row.title),
+    notes: row.notes ? String(row.notes) : null,
+    opened_at: String(row.opened_at),
+    closed_at: row.closed_at ? String(row.closed_at) : null,
+    closed_event_id: row.closed_event_id ? String(row.closed_event_id) : null,
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+  };
+}
+
+export function mapProcessTimelineRow(
+  row: Record<string, unknown>,
+  currentCatId: string,
+): ProcessTimelineItem {
+  const mapped = mapCatTimelineRow(row, currentCatId);
+
+  return {
+    ...mapped,
+    process_id: mapped.process_id ?? "",
+    process_opened_at: mapped.process_opened_at ?? mapped.event_at,
+    process_created_at: mapped.process_created_at ?? mapped.created_at,
+  };
+}
+
+export function mapClinicalProcessDetailRow(
+  processRow: Record<string, unknown>,
+  timelineRows: Record<string, unknown>[],
+): ClinicalProcessDetail {
+  const relatedCat = pickSingleRelation(
+    processRow.cat as Record<string, unknown> | Array<Record<string, unknown>> | null,
+  );
+  const process = mapClinicalProcessRow(processRow);
+  const catId = relatedCat?.id ? String(relatedCat.id) : process.cat_id;
+
+  return {
+    ...process,
+    cat: {
+      id: catId,
+      name: relatedCat?.name ? String(relatedCat.name) : "Gato",
+      archived_at: relatedCat?.archived_at ? String(relatedCat.archived_at) : null,
+    },
+    timeline: timelineRows.map((row) => mapProcessTimelineRow(row, catId)),
   };
 }
 
@@ -166,5 +277,15 @@ export function mapEventCategoryRow(
     is_active: Boolean(row.is_active),
     sort_order: Number(row.sort_order ?? 0),
     subcategories,
+  };
+}
+
+export function mapClinicalProcessTypeRow(row: Record<string, unknown>): ClinicalProcessType {
+  return {
+    id: String(row.id),
+    code: String(row.code),
+    label: String(row.label),
+    is_active: Boolean(row.is_active),
+    sort_order: Number(row.sort_order ?? 0),
   };
 }

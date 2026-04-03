@@ -3,6 +3,8 @@ import {
   mapCatPhotoRow,
   mapCatRow,
   mapCatTimelineRow,
+  mapClinicalProcessDetailRow,
+  mapClinicalProcessTypeRow,
   mapEventCategoryRow,
   mapEventSubcategoryRow,
   mapProfileRow,
@@ -12,16 +14,25 @@ import type {
   AttachmentFileKind,
   Cat,
   CatDetail,
+  ClinicalProcessType,
+  ClinicalProcessDetail,
+  CloseClinicalProcessInput,
+  CreateClinicalProcessInput,
+  CreateClinicalProcessTypeInput,
   CreateEventInput,
   CreateCategoryInput,
   CreateCatInput,
+  CreateProcessEventInput,
   CreateSimpleEventInput,
   CreateSubcategoryInput,
   EventCostDraft,
   EventCostInput,
   EventCategory,
+  ProcessEventKind,
   Profile,
+  SetClinicalProcessTypeActiveStateInput,
   UpdateEventCostInput,
+  UpdateClinicalProcessTypeInput,
   UpdateCatInput,
 } from "@/domain/types";
 import { supabase } from "@/lib/supabase/client";
@@ -75,6 +86,16 @@ function roundAmount(value: number) {
 
 function normalizeCurrencyCode(value?: string) {
   return (value?.trim().toUpperCase() || "MXN").slice(0, 3);
+}
+
+function normalizeOptionalDate(value?: string | null) {
+  const normalized = value?.trim() ?? "";
+  return normalized || null;
+}
+
+function encodeProcessEventNotes(kind: ProcessEventKind, notes: string) {
+  const normalizedNotes = notes.trim();
+  return normalizedNotes ? `kind:${kind}\n\n${normalizedNotes}` : `kind:${kind}`;
 }
 
 function buildEventCostPayload(
@@ -249,7 +270,7 @@ export async function getAuthorizationState(): Promise<AuthorizationState> {
 async function listCatsByArchiveState(archived: boolean): Promise<Cat[]> {
   const baseQuery = supabase
     .from("cats")
-    .select("id, name, notes, archived_at, created_at, updated_at")
+    .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
     .order("name", { ascending: true });
 
   const { data, error } = archived
@@ -282,7 +303,7 @@ export async function createCat(input: CreateCatInput): Promise<Cat> {
       created_by: actorId,
       updated_by: actorId,
     })
-    .select("id, name, notes, archived_at, created_at, updated_at")
+    .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
     .single();
 
   if (error) {
@@ -300,10 +321,11 @@ export async function updateCat(catId: string, input: UpdateCatInput): Promise<C
     .update({
       name: input.name.trim(),
       notes: input.notes.trim() || null,
+      birth_date: normalizeOptionalDate(input.birth_date),
       updated_by: actorId,
     })
     .eq("id", catId)
-    .select("id, name, notes, archived_at, created_at, updated_at")
+    .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
     .single();
 
   if (error) {
@@ -324,7 +346,7 @@ export async function setCatArchivedState(catId: string, archived: boolean): Pro
       updated_by: actorId,
     })
     .eq("id", catId)
-    .select("id, name, notes, archived_at, created_at, updated_at")
+    .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
     .single();
 
   if (error) {
@@ -344,7 +366,7 @@ export async function getCatDetail(catId: string): Promise<CatDetail | null> {
   ] = await Promise.all([
     supabase
       .from("cats")
-      .select("id, name, notes, archived_at, created_at, updated_at")
+      .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
       .eq("id", catId)
       .maybeSingle(),
     supabase
@@ -370,7 +392,7 @@ export async function getCatDetail(catId: string): Promise<CatDetail | null> {
     supabase
       .from("events")
       .select(
-        "id, title, notes, time_kind, event_at, created_at, category:event_categories(label), subcategory:event_subcategories(label), process:clinical_processes(id, title), event_cats!inner(cat_id), event_costs(mode, currency_code, total_amount), event_cat_costs(cat_id, amount)",
+        "id, title, notes, time_kind, event_at, created_at, category:event_categories(label), subcategory:event_subcategories(label), process:clinical_processes!events_process_id_fkey(id, title, opened_at, closed_at, closed_event_id, created_at, process_type:clinical_process_types(label)), event_cats!inner(cat_id), event_costs(mode, currency_code, total_amount), event_cat_costs(cat_id, amount)",
       )
       .eq("event_cats.cat_id", catId)
       .is("voided_at", null)
@@ -562,6 +584,20 @@ export async function listEventCategories(): Promise<EventCategory[]> {
   );
 }
 
+export async function listClinicalProcessTypes(): Promise<ClinicalProcessType[]> {
+  const { data, error } = await supabase
+    .from("clinical_process_types")
+    .select("id, code, label, is_active, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("label", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapClinicalProcessTypeRow);
+}
+
 export async function createEventCategory(input: CreateCategoryInput): Promise<void> {
   const code = input.code?.trim() || slugifyCode(input.label);
 
@@ -583,6 +619,51 @@ export async function createEventSubcategory(input: CreateSubcategoryInput): Pro
     label: input.label.trim(),
     code,
   });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function createClinicalProcessType(
+  input: CreateClinicalProcessTypeInput,
+): Promise<void> {
+  const code = input.code?.trim() || slugifyCode(input.label);
+
+  const { error } = await supabase.from("clinical_process_types").insert({
+    label: input.label.trim(),
+    code,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateClinicalProcessTypeLabel(
+  input: UpdateClinicalProcessTypeInput,
+): Promise<void> {
+  const { error } = await supabase
+    .from("clinical_process_types")
+    .update({
+      label: input.label.trim(),
+    })
+    .eq("id", input.id);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setClinicalProcessTypeActiveState(
+  input: SetClinicalProcessTypeActiveStateInput,
+): Promise<void> {
+  const { error } = await supabase
+    .from("clinical_process_types")
+    .update({
+      is_active: input.is_active,
+    })
+    .eq("id", input.id);
 
   if (error) {
     throw error;
@@ -611,6 +692,117 @@ export async function createEvent(input: CreateEventInput): Promise<void> {
   if (error) {
     throw error;
   }
+}
+
+export async function createClinicalProcess(input: CreateClinicalProcessInput): Promise<string> {
+  const { data, error } = await supabase.rpc("create_clinical_process", {
+    p_cat_id: input.cat_id,
+    p_process_type_id: input.process_type_id,
+    p_title: input.title.trim(),
+    p_notes: input.notes.trim() || null,
+    p_opened_at: input.opened_at,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
+}
+
+export async function getClinicalProcessDetail(
+  processId: string,
+): Promise<ClinicalProcessDetail | null> {
+  const { data: processRow, error: processError } = await supabase
+    .from("clinical_processes")
+    .select(
+      "id, cat_id, process_type_id, title, notes, opened_at, closed_at, closed_event_id, created_at, updated_at, process_type:clinical_process_types(label), cat:cats!inner(id, name, birth_date, archived_at)",
+    )
+    .eq("id", processId)
+    .maybeSingle();
+
+  if (processError) {
+    throw processError;
+  }
+
+  if (!processRow) {
+    return null;
+  }
+
+  const relatedCat = (processRow as Record<string, unknown>).cat as
+    | Record<string, unknown>
+    | Array<Record<string, unknown>>
+    | null
+    | undefined;
+
+  const processCatId =
+    Array.isArray(relatedCat) && relatedCat[0]?.id
+      ? String(relatedCat[0].id)
+      : !Array.isArray(relatedCat) && relatedCat?.id
+        ? String(relatedCat.id)
+        : String(processRow.cat_id);
+
+  const { data: timelineRows, error: timelineError } = await supabase
+    .from("events")
+    .select(
+      "id, title, notes, time_kind, event_at, created_at, category:event_categories(label), subcategory:event_subcategories(label), process:clinical_processes!events_process_id_fkey(id, title, opened_at, closed_at, closed_event_id, created_at, process_type:clinical_process_types(label)), event_costs(mode, currency_code, total_amount), event_cat_costs(cat_id, amount)",
+    )
+    .eq("process_id", processId)
+    .is("voided_at", null)
+    .order("event_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (timelineError) {
+    throw timelineError;
+  }
+
+  return mapClinicalProcessDetailRow(
+    processRow as Record<string, unknown>,
+    ((timelineRows ?? []) as Record<string, unknown>[]).map((row) => ({
+      ...row,
+      event_cat_costs: Array.isArray(row.event_cat_costs)
+        ? row.event_cat_costs.filter((item) => String(item.cat_id) === processCatId)
+        : [],
+    })),
+  );
+}
+
+export async function createProcessEvent(input: CreateProcessEventInput): Promise<string> {
+  const costPayload = buildEventCostPayload(
+    input.cost,
+    input.cost?.mode === "per_cat"
+      ? input.cost.per_cat_amounts.map((entry) => entry.cat_id)
+      : [],
+  );
+
+  const { data, error } = await supabase.rpc("create_process_event", {
+    p_process_id: input.process_id,
+    p_title: input.title.trim(),
+    p_notes: encodeProcessEventNotes(input.kind, input.notes),
+    p_event_at: input.event_at,
+    ...costPayload,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
+}
+
+export async function closeClinicalProcess(input: CloseClinicalProcessInput): Promise<string> {
+  const { data, error } = await supabase.rpc("close_clinical_process", {
+    p_process_id: input.process_id,
+    p_title: input.title.trim(),
+    p_notes: input.notes.trim() || null,
+    p_event_at: input.event_at,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
 }
 
 export async function createSimpleEvent(input: CreateSimpleEventInput): Promise<void> {

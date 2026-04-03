@@ -1,6 +1,14 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createEventCategory, createEventSubcategory, listEventCategories } from "@/data/queries";
+import {
+  createClinicalProcessType,
+  createEventCategory,
+  createEventSubcategory,
+  listClinicalProcessTypes,
+  listEventCategories,
+  setClinicalProcessTypeActiveState,
+  updateClinicalProcessTypeLabel,
+} from "@/data/queries";
 
 export function CategoriesRoute() {
   const queryClient = useQueryClient();
@@ -9,12 +17,22 @@ export function CategoriesRoute() {
   const [subcategoryCategoryId, setSubcategoryCategoryId] = useState("");
   const [subcategoryLabel, setSubcategoryLabel] = useState("");
   const [subcategoryCode, setSubcategoryCode] = useState("");
+  const [processTypeLabel, setProcessTypeLabel] = useState("");
+  const [processTypeCode, setProcessTypeCode] = useState("");
+  const [editingProcessTypeId, setEditingProcessTypeId] = useState<string | null>(null);
+  const [editingProcessTypeLabel, setEditingProcessTypeLabel] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [subcategoryError, setSubcategoryError] = useState<string | null>(null);
+  const [processTypeError, setProcessTypeError] = useState<string | null>(null);
 
   const categoriesQuery = useQuery({
     queryKey: ["categories", "all"],
     queryFn: listEventCategories,
+  });
+
+  const processTypesQuery = useQuery({
+    queryKey: ["process-types", "all"],
+    queryFn: listClinicalProcessTypes,
   });
 
   const activeCategories = useMemo(
@@ -49,6 +67,43 @@ export function CategoriesRoute() {
     },
   });
 
+  const createProcessTypeMutation = useMutation({
+    mutationFn: createClinicalProcessType,
+    onSuccess: async () => {
+      setProcessTypeLabel("");
+      setProcessTypeCode("");
+      setProcessTypeError(null);
+      await queryClient.invalidateQueries({ queryKey: ["process-types"] });
+    },
+    onError: (error: Error) => {
+      setProcessTypeError(error.message);
+    },
+  });
+
+  const updateProcessTypeMutation = useMutation({
+    mutationFn: updateClinicalProcessTypeLabel,
+    onSuccess: async () => {
+      setEditingProcessTypeId(null);
+      setEditingProcessTypeLabel("");
+      setProcessTypeError(null);
+      await queryClient.invalidateQueries({ queryKey: ["process-types"] });
+    },
+    onError: (error: Error) => {
+      setProcessTypeError(error.message);
+    },
+  });
+
+  const toggleProcessTypeMutation = useMutation({
+    mutationFn: setClinicalProcessTypeActiveState,
+    onSuccess: async () => {
+      setProcessTypeError(null);
+      await queryClient.invalidateQueries({ queryKey: ["process-types"] });
+    },
+    onError: (error: Error) => {
+      setProcessTypeError(error.message);
+    },
+  });
+
   function handleCategorySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCategoryError(null);
@@ -68,12 +123,35 @@ export function CategoriesRoute() {
     });
   }
 
+  function handleProcessTypeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProcessTypeError(null);
+    createProcessTypeMutation.mutate({
+      label: processTypeLabel,
+      code: processTypeCode,
+    });
+  }
+
+  function handleProcessTypeUpdateSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingProcessTypeId) {
+      return;
+    }
+
+    setProcessTypeError(null);
+    updateProcessTypeMutation.mutate({
+      id: editingProcessTypeId,
+      label: editingProcessTypeLabel,
+    });
+  }
+
   return (
     <section className="stack">
       <div className="panel stack stack--compact">
         <div>
-          <h1>Categorias</h1>
-          <p className="muted">Lectura y captura minima de categorias y subcategorias.</p>
+          <h1>Catalogos</h1>
+          <p className="muted">Categorias de eventos y tipos de procesos clinicos editables.</p>
         </div>
       </div>
 
@@ -164,6 +242,141 @@ export function CategoriesRoute() {
             </div>
           </form>
         </section>
+      </div>
+
+      <div className="two-column">
+        <section className="panel stack stack--compact">
+          <div>
+            <h2>Nuevo tipo de proceso</h2>
+            <p className="muted">Se usa para clasificar seguimientos clinicos.</p>
+          </div>
+          <form className="form" onSubmit={handleProcessTypeSubmit}>
+            <div className="field">
+              <label htmlFor="process-type-label">Nombre</label>
+              <input
+                id="process-type-label"
+                value={processTypeLabel}
+                onChange={(event) => setProcessTypeLabel(event.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="process-type-code">Codigo opcional</label>
+              <input
+                id="process-type-code"
+                value={processTypeCode}
+                onChange={(event) => setProcessTypeCode(event.target.value)}
+                placeholder="Se genera si lo dejas vacio"
+              />
+            </div>
+            {processTypeError ? <p className="error">{processTypeError}</p> : null}
+            <div className="actions">
+              <button className="button" type="submit" disabled={createProcessTypeMutation.isPending}>
+                {createProcessTypeMutation.isPending ? "Guardando..." : "Crear tipo"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel stack stack--compact">
+          <div>
+            <h2>Editar tipo</h2>
+            <p className="muted">Puedes renombrar o activar e inactivar sin romper historial.</p>
+          </div>
+          {!editingProcessTypeId ? (
+            <div className="panel panel--subtle empty-state empty-state--tight">
+              <p className="muted">Elige un tipo de la lista para editarlo aqui.</p>
+            </div>
+          ) : (
+            <form className="form" onSubmit={handleProcessTypeUpdateSubmit}>
+              <div className="field">
+                <label htmlFor="process-type-edit-label">Nombre</label>
+                <input
+                  id="process-type-edit-label"
+                  value={editingProcessTypeLabel}
+                  onChange={(event) => setEditingProcessTypeLabel(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="actions">
+                <button className="button" type="submit" disabled={updateProcessTypeMutation.isPending}>
+                  {updateProcessTypeMutation.isPending ? "Guardando..." : "Guardar nombre"}
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() => {
+                    setEditingProcessTypeId(null);
+                    setEditingProcessTypeLabel("");
+                    setProcessTypeError(null);
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </div>
+
+      <div className="stack">
+        {processTypesQuery.isLoading ? (
+          <div className="panel">
+            <p className="muted">Cargando tipos de proceso...</p>
+          </div>
+        ) : null}
+        {processTypesQuery.isError ? (
+          <div className="panel">
+            <p className="error">No fue posible cargar los tipos de proceso.</p>
+          </div>
+        ) : null}
+        {processTypesQuery.data?.length ? (
+          <section className="panel stack stack--compact">
+            <div>
+              <h2>Tipos de proceso</h2>
+              <p className="muted">El selector de nuevos procesos solo muestra los que están activos.</p>
+            </div>
+            <div className="stack stack--compact">
+              {processTypesQuery.data.map((processType) => (
+                <article className="catalog-row" key={processType.id}>
+                  <div>
+                    <strong>{processType.label}</strong>
+                    <p className="muted">{processType.code}</p>
+                  </div>
+                  <div className="catalog-row__actions">
+                    <span className={`status ${processType.is_active ? "" : "status--neutral"}`}>
+                      {processType.is_active ? "Activo" : "Inactivo"}
+                    </span>
+                    <button
+                      className="button button--ghost button--small"
+                      type="button"
+                      onClick={() => {
+                        setEditingProcessTypeId(processType.id);
+                        setEditingProcessTypeLabel(processType.label);
+                        setProcessTypeError(null);
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="button button--secondary button--small"
+                      type="button"
+                      onClick={() =>
+                        toggleProcessTypeMutation.mutate({
+                          id: processType.id,
+                          is_active: !processType.is_active,
+                        })
+                      }
+                      disabled={toggleProcessTypeMutation.isPending}
+                    >
+                      {processType.is_active ? "Inactivar" : "Activar"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       <div className="stack">

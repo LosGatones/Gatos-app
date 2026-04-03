@@ -1,12 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useParams } from "react-router-dom";
-import type { EventCostInput } from "@/domain/types";
+import type { EventCostInput, ProcessEventKind } from "@/domain/types";
 import {
+  createClinicalProcess,
   createEvent,
   getCatDetail,
   getEventCostDraft,
   listActiveCats,
+  listClinicalProcessTypes,
   listEventCategories,
   setCatArchivedState,
   updateEventCost,
@@ -60,12 +62,98 @@ function buildPerCatMap(catIds: string[], current: Record<string, string>) {
   }, {});
 }
 
+function getProcessKindLabel(kind: ProcessEventKind | null) {
+  if (!kind) {
+    return null;
+  }
+
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+function formatDateOnly(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "long",
+  }).format(new Date(`${date}T00:00:00`));
+}
+
+function getBirthdayMetrics(birthDate: string | null) {
+  if (!birthDate) {
+    return null;
+  }
+
+  const [year, month, day] = birthDate.split("-").map((value) => Number(value));
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const birthdayThisYear = new Date(todayStart.getFullYear(), month - 1, day);
+
+  if (month === 2 && day === 29 && birthdayThisYear.getMonth() !== 1) {
+    birthdayThisYear.setMonth(1, 28);
+  }
+
+  let nextBirthday = birthdayThisYear;
+
+  if (birthdayThisYear < todayStart) {
+    nextBirthday = new Date(todayStart.getFullYear() + 1, month - 1, day);
+
+    if (month === 2 && day === 29 && nextBirthday.getMonth() !== 1) {
+      nextBirthday.setMonth(1, 28);
+    }
+  }
+
+  let age = todayStart.getFullYear() - year;
+  const hasHadBirthdayThisYear =
+    todayStart.getMonth() > birthdayThisYear.getMonth() ||
+    (todayStart.getMonth() === birthdayThisYear.getMonth() &&
+      todayStart.getDate() >= birthdayThisYear.getDate());
+
+  if (!hasHadBirthdayThisYear) {
+    age -= 1;
+  }
+
+  if (nextBirthday.getTime() === todayStart.getTime()) {
+    return {
+      age: Math.max(age, 0),
+      nextBirthdayLabel: "Hoy cumple años",
+    };
+  }
+
+  let cursor = new Date(todayStart);
+  let monthsUntilBirthday = 0;
+
+  while (true) {
+    const nextMonthCursor = new Date(cursor);
+    nextMonthCursor.setMonth(nextMonthCursor.getMonth() + 1);
+
+    if (nextMonthCursor <= nextBirthday) {
+      cursor = nextMonthCursor;
+      monthsUntilBirthday += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysUntilBirthday = Math.round((nextBirthday.getTime() - cursor.getTime()) / msPerDay);
+
+  return {
+    age: Math.max(age, 0),
+    nextBirthdayLabel: `${monthsUntilBirthday} meses y ${Math.max(daysUntilBirthday, 0)} días`,
+  };
+}
+
 export function CatDetailRoute() {
   const params = useParams();
   const catId = params.catId;
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [title, setTitle] = useState("");
   const [eventNotes, setEventNotes] = useState("");
   const [eventAt, setEventAt] = useState(() => toDateTimeLocalValue(new Date()));
@@ -74,6 +162,11 @@ export function CatDetailRoute() {
   const [selectedRelatedCatIds, setSelectedRelatedCatIds] = useState<string[]>([]);
   const [catError, setCatError] = useState<string | null>(null);
   const [eventError, setEventError] = useState<string | null>(null);
+  const [processTitle, setProcessTitle] = useState("");
+  const [processNotes, setProcessNotes] = useState("");
+  const [processTypeId, setProcessTypeId] = useState("");
+  const [processOpenedAt, setProcessOpenedAt] = useState(() => toDateTimeLocalValue(new Date()));
+  const [processError, setProcessError] = useState<string | null>(null);
   const [costEnabled, setCostEnabled] = useState(false);
   const [costMode, setCostMode] = useState<"per_cat" | "shared_total">("shared_total");
   const [sharedTotalAmount, setSharedTotalAmount] = useState("");
@@ -102,6 +195,11 @@ export function CatDetailRoute() {
     queryFn: listEventCategories,
   });
 
+  const processTypesQuery = useQuery({
+    queryKey: ["process-types", "all"],
+    queryFn: listClinicalProcessTypes,
+  });
+
   const activeCatsQuery = useQuery({
     queryKey: ["cats", "active"],
     queryFn: listActiveCats,
@@ -120,7 +218,21 @@ export function CatDetailRoute() {
 
     setName(catDetailQuery.data.name);
     setNotes(catDetailQuery.data.notes ?? "");
+    setBirthDate(catDetailQuery.data.birth_date ?? "");
   }, [catDetailQuery.data]);
+
+  useEffect(() => {
+    const activeTypes = processTypesQuery.data?.filter((type) => type.is_active) ?? [];
+
+    if (!activeTypes.length) {
+      setProcessTypeId("");
+      return;
+    }
+
+    setProcessTypeId((current) =>
+      current && activeTypes.some((type) => type.id === current) ? current : activeTypes[0]?.id ?? "",
+    );
+  }, [processTypesQuery.data]);
 
   const filteredSubcategories = useMemo(() => {
     if (!categoryId) {
@@ -129,6 +241,11 @@ export function CatDetailRoute() {
 
     return categoriesQuery.data?.find((category) => category.id === categoryId)?.subcategories ?? [];
   }, [categoriesQuery.data, categoryId]);
+
+  const activeProcessTypes = useMemo(
+    () => processTypesQuery.data?.filter((type) => type.is_active) ?? [],
+    [processTypesQuery.data],
+  );
 
   const relatedCatOptions = useMemo(() => {
     return (activeCatsQuery.data ?? []).filter((cat) => cat.id !== catId);
@@ -182,7 +299,8 @@ export function CatDetailRoute() {
   }, [eventCostDraftQuery.data]);
 
   const updateCatMutation = useMutation({
-    mutationFn: (input: { name: string; notes: string }) => updateCat(catId ?? "", input),
+    mutationFn: (input: { name: string; notes: string; birth_date: string | null }) =>
+      updateCat(catId ?? "", input),
     onSuccess: async () => {
       setCatError(null);
       await queryClient.invalidateQueries({ queryKey: ["cats"] });
@@ -202,6 +320,23 @@ export function CatDetailRoute() {
     },
     onError: (error: Error) => {
       setCatError(error.message);
+    },
+  });
+
+  const createProcessMutation = useMutation({
+    mutationFn: createClinicalProcess,
+    onSuccess: async () => {
+      setProcessTitle("");
+      setProcessNotes("");
+      setProcessTypeId("");
+      setProcessOpenedAt(toDateTimeLocalValue(new Date()));
+      setProcessError(null);
+      await queryClient.invalidateQueries({ queryKey: ["cats"] });
+      await queryClient.invalidateQueries({ queryKey: ["cats", "detail"] });
+      await queryClient.invalidateQueries({ queryKey: ["cats", "detail", catId] });
+    },
+    onError: (error: Error) => {
+      setProcessError(error.message);
     },
   });
 
@@ -236,6 +371,7 @@ export function CatDetailRoute() {
       await queryClient.invalidateQueries({ queryKey: ["cats"] });
       await queryClient.invalidateQueries({ queryKey: ["cats", "detail"] });
       await queryClient.invalidateQueries({ queryKey: ["cats", "detail", catId] });
+      await queryClient.invalidateQueries({ queryKey: ["processes"] });
     },
     onError: (error: Error) => {
       setEditingCostError(error.message);
@@ -315,7 +451,19 @@ export function CatDetailRoute() {
   function handleCatSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCatError(null);
-    updateCatMutation.mutate({ name, notes });
+    updateCatMutation.mutate({ name, notes, birth_date: birthDate || null });
+  }
+
+  function handleProcessSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProcessError(null);
+    createProcessMutation.mutate({
+      cat_id: catId ?? "",
+      process_type_id: processTypeId,
+      title: processTitle,
+      notes: processNotes,
+      opened_at: new Date(processOpenedAt).toISOString(),
+    });
   }
 
   function handleEventSubmit(event: FormEvent<HTMLFormElement>) {
@@ -420,6 +568,7 @@ export function CatDetailRoute() {
   const cat = catDetailQuery.data;
   const isArchived = Boolean(cat.archived_at);
   const showCostTotal = (cat.cost_total_amount ?? 0) > 0;
+  const birthdayMetrics = getBirthdayMetrics(cat.birth_date);
 
   return (
     <section className="stack">
@@ -480,6 +629,34 @@ export function CatDetailRoute() {
                     disabled={isArchived}
                   />
                 </div>
+                <div className="field">
+                  <label htmlFor="detail-birth-date">Fecha de nacimiento</label>
+                  <input
+                    id="detail-birth-date"
+                    type="date"
+                    value={birthDate}
+                    onChange={(event) => setBirthDate(event.target.value)}
+                    disabled={isArchived || updateCatMutation.isPending}
+                  />
+                </div>
+                <div className="detail-facts">
+                  <div className="detail-fact">
+                    <span className="detail-fact__label">Nacimiento</span>
+                    <strong>{cat.birth_date ? formatDateOnly(cat.birth_date) : "Sin registrar"}</strong>
+                  </div>
+                  <div className="detail-fact">
+                    <span className="detail-fact__label">Edad actual</span>
+                    <strong>
+                      {birthdayMetrics ? `${birthdayMetrics.age} ${birthdayMetrics.age === 1 ? "año" : "años"}` : "Sin registrar"}
+                    </strong>
+                  </div>
+                  <div className="detail-fact">
+                    <span className="detail-fact__label">Próximo cumpleaños</span>
+                    <strong>
+                      {birthdayMetrics ? birthdayMetrics.nextBirthdayLabel : "Sin registrar"}
+                    </strong>
+                  </div>
+                </div>
                 {catError ? <p className="error">{catError}</p> : null}
                 <div className="actions">
                   <button
@@ -488,6 +665,90 @@ export function CatDetailRoute() {
                     disabled={isArchived || updateCatMutation.isPending}
                   >
                     {updateCatMutation.isPending ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="panel panel--subtle stack stack--compact">
+              <div className="section-header">
+                <div>
+                  <h2>Nuevo proceso clinico</h2>
+                  <p className="muted">
+                    {isArchived
+                      ? "Este gato esta archivado. Reactivalo para iniciar seguimiento."
+                      : "Abre un seguimiento clinico ligero que luego tendra su propia subtimeline."}
+                  </p>
+                </div>
+              </div>
+
+              <form className="form" onSubmit={handleProcessSubmit}>
+                <div className="field">
+                  <label htmlFor="process-type">Tipo de proceso</label>
+                  <select
+                    id="process-type"
+                    value={processTypeId}
+                    onChange={(event) => setProcessTypeId(event.target.value)}
+                    disabled={isArchived || createProcessMutation.isPending || !activeProcessTypes.length}
+                    required
+                  >
+                    <option value="">Selecciona un tipo</option>
+                    {activeProcessTypes.map((processType) => (
+                      <option key={processType.id} value={processType.id}>
+                        {processType.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {!activeProcessTypes.length ? (
+                  <p className="muted">
+                    Primero activa o crea al menos un tipo de proceso en Catálogos.
+                  </p>
+                ) : null}
+                <div className="field">
+                  <label htmlFor="process-title">Titulo del proceso</label>
+                  <input
+                    id="process-title"
+                    value={processTitle}
+                    onChange={(event) => setProcessTitle(event.target.value)}
+                    disabled={isArchived || createProcessMutation.isPending}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="process-opened-at">Fecha de apertura</label>
+                  <input
+                    id="process-opened-at"
+                    type="datetime-local"
+                    value={processOpenedAt}
+                    onChange={(event) => setProcessOpenedAt(event.target.value)}
+                    disabled={isArchived || createProcessMutation.isPending}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="process-notes">Notas</label>
+                  <textarea
+                    id="process-notes"
+                    rows={3}
+                    value={processNotes}
+                    onChange={(event) => setProcessNotes(event.target.value)}
+                    disabled={isArchived || createProcessMutation.isPending}
+                  />
+                </div>
+
+                {processError ? <p className="error">{processError}</p> : null}
+                <div className="actions">
+                  <button
+                    className="button"
+                    type="submit"
+                    disabled={
+                      isArchived || createProcessMutation.isPending || !processTypeId || !activeProcessTypes.length
+                    }
+                  >
+                    {createProcessMutation.isPending ? "Guardando..." : "Crear proceso"}
                   </button>
                 </div>
               </form>
@@ -582,17 +843,14 @@ export function CatDetailRoute() {
                   </select>
                 </div>
 
-                <fieldset
-                  className="field"
-                  disabled={isArchived || createEventMutation.isPending}
-                >
+                <fieldset className="field" disabled={isArchived || createEventMutation.isPending}>
                   <legend>Tambien afecta a</legend>
                   {!relatedCatOptions.length ? (
                     <p className="muted">No hay otros gatos activos para relacionar.</p>
                   ) : (
-                    <div className="stack stack--compact">
+                    <div className="selection-list">
                       {relatedCatOptions.map((relatedCat) => (
-                        <label key={relatedCat.id}>
+                        <label className="selection-chip" key={relatedCat.id}>
                           <input
                             type="checkbox"
                             checked={selectedRelatedCatIds.includes(relatedCat.id)}
@@ -604,7 +862,6 @@ export function CatDetailRoute() {
                               )
                             }
                           />
-                          {" "}
                           {relatedCat.name}
                         </label>
                       ))}
@@ -712,16 +969,38 @@ export function CatDetailRoute() {
                     const isEditingCost = editingCostEventId === item.id;
                     const itemCost = item.cost;
                     const itemCurrency = itemCost?.currency_code ?? "MXN";
+                    const kindLabel = getProcessKindLabel(item.process_event_kind);
 
                     return (
-                      <article className="timeline__item" key={item.id}>
+                      <article
+                        className={`timeline__item ${item.is_process_header ? "timeline__item--process" : ""}`}
+                        key={item.id}
+                      >
                         <div className="timeline__meta">
                           <span>{item.time_kind === "scheduled" ? "Programado" : "Registrado"}</span>
                           <span>{formatDate(item.event_at)}</span>
                         </div>
                         <div className="timeline__header">
-                          <h3>{item.title}</h3>
-                          {!isArchived ? (
+                          <div className="stack stack--compact">
+                            {item.is_process_header ? (
+                              <span className="process-badge">Proceso clinico</span>
+                            ) : null}
+                            <h3>{item.is_process_header ? item.process_title ?? item.title : item.title}</h3>
+                            {item.is_process_header && item.process_type_label ? (
+                              <p className="muted timeline__labels">
+                                Tipo: {item.process_type_label}
+                                {item.process_closed_at ? " · Cerrado" : " · Abierto"}
+                              </p>
+                            ) : null}
+                            {!item.is_process_header && kindLabel ? (
+                              <span className="process-chip">{kindLabel}</span>
+                            ) : null}
+                          </div>
+                          {item.is_process_header ? (
+                            <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
+                              Ver seguimiento
+                            </Link>
+                          ) : !isArchived ? (
                             <button
                               className="button button--ghost button--small"
                               type="button"
@@ -739,7 +1018,10 @@ export function CatDetailRoute() {
                           ) : null}
                         </div>
                         <p className="muted timeline__labels">
-                          {[item.category_label, item.subcategory_label].filter(Boolean).join(" / ") || "Sin categoria"}
+                          {item.is_process_header
+                            ? `Seguimiento ligado al historial de ${cat.name}.`
+                            : [item.category_label, item.subcategory_label].filter(Boolean).join(" / ") ||
+                              "Sin categoria"}
                         </p>
                         {item.notes ? <p>{item.notes}</p> : null}
                         {itemCost && itemCost.mode !== "none" && itemCost.cat_amount !== null ? (
@@ -749,17 +1031,14 @@ export function CatDetailRoute() {
                               : `${formatMoney(itemCost.cat_amount, itemCurrency)} para este gato`}
                           </p>
                         ) : null}
-                        {item.process_id ? (
+                        {item.process_id && !item.is_process_header ? (
                           <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
-                            Ver proceso: {item.process_title ?? "Proceso clinico"}
+                            Ver seguimiento: {item.process_title ?? "Proceso clinico"}
                           </Link>
                         ) : null}
-
                         {isEditingCost ? (
                           <form className="cost-editor" onSubmit={handleEditCostSubmit}>
-                            {eventCostDraftQuery.isLoading ? (
-                              <p className="muted">Cargando costo...</p>
-                            ) : null}
+                            {eventCostDraftQuery.isLoading ? <p className="muted">Cargando costo...</p> : null}
                             {eventCostDraftQuery.data ? (
                               <>
                                 <div className="section-header section-header--compact">
@@ -777,7 +1056,6 @@ export function CatDetailRoute() {
                                     {editingCostEnabled ? "Quitar" : "Agregar"}
                                   </button>
                                 </div>
-
                                 {editingCostEnabled ? (
                                   <div className="stack stack--compact">
                                     <div className="field">
@@ -795,7 +1073,6 @@ export function CatDetailRoute() {
                                         <option value="per_cat">Monto por gato</option>
                                       </select>
                                     </div>
-
                                     {editingCostMode === "shared_total" ? (
                                       <div className="field">
                                         <label htmlFor={`timeline-shared-total-${item.id}`}>
@@ -806,9 +1083,7 @@ export function CatDetailRoute() {
                                           inputMode="decimal"
                                           placeholder="0.00"
                                           value={editingSharedTotalAmount}
-                                          onChange={(event) =>
-                                            setEditingSharedTotalAmount(event.target.value)
-                                          }
+                                          onChange={(event) => setEditingSharedTotalAmount(event.target.value)}
                                         />
                                       </div>
                                     ) : (
@@ -838,7 +1113,6 @@ export function CatDetailRoute() {
                                 ) : null}
                               </>
                             ) : null}
-
                             {editingCostError ? <p className="error">{editingCostError}</p> : null}
                             <div className="actions">
                               <button
@@ -909,9 +1183,7 @@ export function CatDetailRoute() {
                   <button
                     className="button"
                     type="submit"
-                    disabled={
-                      isArchived || !primaryPhotoFile || uploadPrimaryPhotoMutation.isPending
-                    }
+                    disabled={isArchived || !primaryPhotoFile || uploadPrimaryPhotoMutation.isPending}
                   >
                     {uploadPrimaryPhotoMutation.isPending
                       ? "Subiendo..."
@@ -953,7 +1225,6 @@ export function CatDetailRoute() {
                   </button>
                 </div>
               </form>
-
               {!cat.attachments.length ? (
                 <div className="panel panel--subtle empty-state empty-state--tight">
                   <p className="muted">Todavia no hay adjuntos registrados.</p>
@@ -971,19 +1242,14 @@ export function CatDetailRoute() {
                               ? "Documento"
                               : "Archivo"}
                           {" · "}
-                          {new Intl.DateTimeFormat("es-MX", {
-                            dateStyle: "medium",
-                          }).format(new Date(attachment.created_at))}
+                          {new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
+                            new Date(attachment.created_at),
+                          )}
                           {attachment.is_primary_for_cat ? " · Foto principal" : ""}
                         </p>
                       </div>
                       {attachment.signed_url ? (
-                        <a
-                          className="inline-link"
-                          href={attachment.signed_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                        <a className="inline-link" href={attachment.signed_url} target="_blank" rel="noreferrer">
                           Abrir
                         </a>
                       ) : null}
