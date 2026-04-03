@@ -16,7 +16,7 @@ export default defineConfig({
         theme_color: "#7848A8",
         background_color: "#FFFFFF",
         display: "standalone",
-        start_url: "/cats",
+        start_url: "/",
         scope: "/",
         icons: [
           {
