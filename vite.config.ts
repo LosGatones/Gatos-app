@@ -8,16 +8,29 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [],
+      includeAssets: ["apple-touch-icon.png"],
       manifest: {
         name: "Gatos App",
         short_name: "Gatos",
+        lang: "es-MX",
         theme_color: "#7848A8",
         background_color: "#FFFFFF",
         display: "standalone",
         start_url: "/cats",
         scope: "/",
-        icons: [],
+        icons: [
+          {
+            src: "/pwa-192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
       },
     }),
   ],
