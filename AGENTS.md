@@ -111,6 +111,15 @@ Reglas visuales:
 - Mantener alto contraste y buena legibilidad.
 - Interfaz limpia, respirada y con pocas cajas.
 
+## Orientación de lectura y composición
+
+- La app puede usar un enfoque de perfil + feed cronológico para lectura.
+- Social para leer, estructurado para capturar.
+- El detalle del gato debe poder sentirse como perfil + timeline/feed.
+- Los procesos clínicos pueden presentarse como hilos o seguimientos especiales dentro del timeline.
+- No convertir la app en red social literal: sin likes, comentarios, engagement ni lenguaje de publicación pública.
+- Mantener la captura estructurada mediante sheets, modales o composer ligero.
+
 ## Reglas sobre skills
 
 - Cuando la tarea sea visual o de interfaz, priorizar una skill de frontend/UI que emule una estética tipo Liquid Glass de Apple.

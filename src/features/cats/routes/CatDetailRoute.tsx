@@ -77,6 +77,21 @@ function formatDateOnly(date: string) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function formatShortDate(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+  }).format(new Date(date));
+}
+
 function getBirthdayMetrics(birthDate: string | null) {
   if (!birthDate) {
     return null;
@@ -605,33 +620,61 @@ export function CatDetailRoute() {
 
   return (
     <section className="page">
-      <div className="panel stack stack--airy surface-hero">
+      <div className="panel stack stack--airy surface-hero cat-detail-shell">
         <div className="detail-header hero-card__top">
-          <div className="stack stack--compact hero-card__title">
-            <Link className="back-link" to={isArchived ? "/archive" : "/cats"}>
-              Volver
-            </Link>
-            <span className="eyebrow">Detalle del gato</span>
-            <h1>{cat.name}</h1>
-            <p className="muted">
-              {isArchived
-                ? "Registro en consulta. La captura queda bloqueada hasta reactivarlo."
-                : "Perfil, timeline y seguimiento general en una sola vista."}
-            </p>
+          <div className="cat-profile-header">
+            <div className="cat-profile-header__avatar">
+              {cat.primary_photo?.signed_url ? (
+                <img
+                  src={cat.primary_photo.signed_url}
+                  alt={cat.primary_photo.caption ?? `Foto de ${cat.name}`}
+                />
+              ) : (
+                <span aria-hidden="true">{getInitials(cat.name)}</span>
+              )}
+            </div>
+            <div className="stack stack--compact hero-card__title">
+              <Link className="back-link" to={isArchived ? "/archive" : "/cats"}>
+                Volver
+              </Link>
+              <span className="eyebrow">Perfil del gato</span>
+              <h1>{cat.name}</h1>
+              <p className="muted">
+                {isArchived
+                  ? "Registro en consulta. La captura queda bloqueada hasta reactivarlo."
+                  : "Perfil, feed cronologico y seguimiento general en una sola vista."}
+              </p>
+              <div className="cat-profile-header__pills">
+                <span className={`status ${isArchived ? "status--neutral" : ""}`}>
+                  {isArchived ? "Archivado" : "Activo"}
+                </span>
+                {cat.birth_date ? (
+                  <span className="profile-inline-pill">Cumple: {formatDateOnly(cat.birth_date)}</span>
+                ) : null}
+                <span className="profile-inline-pill">Creado {formatShortDate(cat.created_at)}</span>
+              </div>
+            </div>
           </div>
-          <span className={`status ${isArchived ? "status--neutral" : ""}`}>
-            {isArchived ? "Archivado" : "Activo"}
-          </span>
+          <div className="cat-profile-quickpanel">
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Perfil</span>
+              <strong>{isArchived ? "Solo consulta" : "Activo para registrar"}</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Feed</span>
+              <strong>{cat.timeline.length} entradas visibles</strong>
+            </div>
+          </div>
         </div>
 
-        <div className="detail-grid">
+        <div className="detail-grid detail-grid--social">
           <div className="surface-group">
-            <section className="panel panel--subtle panel--section stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact cat-profile-panel">
               <div className="section-header form-card__head">
                 <div>
-                  <h2>Datos del gato</h2>
+                  <h2>Resumen del perfil</h2>
                   <p className="muted">
-                    {isArchived ? "En consulta. Reactiva para editar." : "Nombre y notas generales."}
+                    {isArchived ? "En consulta. Reactiva para editar." : "Nombre, notas y datos base del perfil."}
                   </p>
                 </div>
                 <button
@@ -709,10 +752,10 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="panel panel--subtle panel--section stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact" id="new-process">
               <div className="section-header form-card__head">
                 <div>
-                  <h2>Nuevo proceso clinico</h2>
+                  <h2>Nuevo seguimiento clinico</h2>
                   <p className="muted">
                     {isArchived
                       ? "Este gato esta archivado. Reactivalo para iniciar seguimiento."
@@ -794,14 +837,14 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="panel panel--subtle panel--section stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact" id="new-event">
               <div className="section-header form-card__head">
                 <div>
-                  <h2>Nuevo evento</h2>
+                  <h2>Nuevo registro</h2>
                   <p className="muted">
                     {isArchived
                       ? "Este gato esta archivado. Reactivalo para registrar nuevos eventos."
-                      : "Registra un evento desde este detalle y aparecera en el timeline."}
+                      : "Registra actividad desde este perfil y aparecera en el feed."}
                   </p>
                 </div>
               </div>
@@ -1001,17 +1044,22 @@ export function CatDetailRoute() {
               </form>
             </section>
 
-            <section className="section-shell">
-              <div className="section-shell__head">
-                <span className="eyebrow">Historial</span>
-                <h2>Timeline</h2>
+            <section className="section-shell" id="cat-feed">
+              <div className="section-shell__head feed-head">
+                <div>
+                  <span className="eyebrow">Actividad</span>
+                  <h2>Feed del perfil</h2>
+                </div>
+                <p className="muted">
+                  Lee primero el historial y baja a captura solo cuando necesites registrar algo nuevo.
+                </p>
               </div>
               {!cat.timeline.length ? (
                 <div className="panel panel--subtle empty-state empty-state--tight">
-                  <p className="muted">Todavia no hay eventos para este gato.</p>
+                  <p className="muted">Todavia no hay actividad registrada para este perfil.</p>
                 </div>
               ) : (
-                <div className="timeline">
+                <div className="timeline timeline--feed">
                   {cat.timeline.map((item) => {
                     const isEditingCost = editingCostEventId === item.id;
                     const isDeleting = deletingEventId === item.id;
@@ -1025,7 +1073,7 @@ export function CatDetailRoute() {
 
                     return (
                       <article
-                        className={`timeline__item ${item.is_process_header ? "timeline__item--process" : ""}`}
+                        className={`timeline__item timeline__post ${item.is_process_header ? "timeline__item--process" : ""}`}
                         key={item.id}
                       >
                         <div className="timeline__meta">
@@ -1034,9 +1082,10 @@ export function CatDetailRoute() {
                         </div>
                         <div className="timeline__header">
                           <div className="timeline__body">
-                            {item.is_process_header ? (
-                              <span className="process-badge">Proceso clinico</span>
-                            ) : null}
+                            <div className="timeline__badge-row">
+                              {item.is_process_header ? (
+                                <span className="process-badge">Seguimiento especial</span>
+                              ) : null}
                             <h3>{item.is_process_header ? item.process_title ?? item.title : item.title}</h3>
                             {item.is_process_header && item.process_type_label ? (
                               <p className="muted timeline__labels">
@@ -1047,10 +1096,11 @@ export function CatDetailRoute() {
                             {!item.is_process_header && kindLabel ? (
                               <span className="process-chip">{kindLabel}</span>
                             ) : null}
+                            </div>
                           </div>
                           {item.is_process_header ? (
                             <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
-                              Ver seguimiento
+                              Abrir seguimiento
                             </Link>
                           ) : !isArchived ? (
                             <div className="timeline__actions">
@@ -1085,7 +1135,7 @@ export function CatDetailRoute() {
                         </div>
                         <p className="muted timeline__labels">
                           {item.is_process_header
-                            ? `Seguimiento ligado al historial de ${cat.name}.`
+                            ? `Seguimiento ligado al feed de ${cat.name}.`
                             : [item.category_label, item.subcategory_label].filter(Boolean).join(" / ") ||
                               "Sin categoria"}
                         </p>
@@ -1093,13 +1143,13 @@ export function CatDetailRoute() {
                         {itemCost && itemCost.mode !== "none" && itemCost.cat_amount !== null ? (
                           <p className="timeline__cost">
                             {itemCost.mode === "shared_total" && itemCost.total_amount !== null
-                              ? `${formatMoney(itemCost.cat_amount, itemCurrency)} para este gato · total ${formatMoney(itemCost.total_amount, itemCurrency)}`
-                              : `${formatMoney(itemCost.cat_amount, itemCurrency)} para este gato`}
+                              ? `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil · total ${formatMoney(itemCost.total_amount, itemCurrency)}`
+                              : `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil`}
                           </p>
                         ) : null}
                         {item.process_id && !item.is_process_header ? (
                           <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
-                            Ver seguimiento: {item.process_title ?? "Proceso clinico"}
+                            Ver hilo: {item.process_title ?? "Proceso clinico"}
                           </Link>
                         ) : null}
                         {isDeleting && timelineActionError ? (
@@ -1204,13 +1254,13 @@ export function CatDetailRoute() {
 
           <aside className="aside-stack">
             {showCostTotal ? (
-              <section className="panel panel--subtle cost-total-card">
+              <section className="panel panel--subtle cost-total-card profile-accent-card">
                 <p className="cost-total-card__label">Acumulado</p>
                 <strong>{formatMoney(cat.cost_total_amount ?? 0)}</strong>
               </section>
             ) : null}
 
-            <section className="panel panel--subtle panel--section stack stack--compact">
+            <section className="panel panel--subtle panel--section stack stack--compact" id="cat-media">
               <div>
                 <h2>Foto principal</h2>
                 <p className="muted">

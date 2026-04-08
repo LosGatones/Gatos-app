@@ -1,13 +1,15 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   authStateQueryKey,
   currentProfileQueryKey,
   getCurrentProfile,
 } from "@/data/queries";
+import { QuickComposer } from "@/features/composer/components/QuickComposer";
 import { supabase } from "@/lib/supabase/client";
 
 export function AppShell() {
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const profileQuery = useQuery({
@@ -37,6 +39,12 @@ export function AppShell() {
     },
   });
 
+  const catsMatch = matchPath("/cats/*", location.pathname) ?? matchPath("/cats", location.pathname);
+  const currentCatMatch =
+    matchPath("/cats/:catId/processes/:processId", location.pathname) ??
+    matchPath("/cats/:catId", location.pathname);
+  const currentCatId = currentCatMatch?.params.catId ?? null;
+
   return (
     <div className="shell">
       <header className="shell__header">
@@ -64,6 +72,7 @@ export function AppShell() {
       <main className="shell__main">
         <Outlet />
       </main>
+      {catsMatch ? <QuickComposer currentCatId={currentCatId} /> : null}
     </div>
   );
 }

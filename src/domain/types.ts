@@ -27,6 +27,10 @@ export type Cat = {
   updated_at: string;
 };
 
+export type CatCard = Cat & {
+  primary_photo_url: string | null;
+};
+
 export type CatPhoto = {
   id: string;
   bucket: string;

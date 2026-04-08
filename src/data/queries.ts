@@ -13,6 +13,7 @@ import type { Session } from "@supabase/supabase-js";
 import type {
   AttachmentFileKind,
   Cat,
+  CatCard,
   CatDetail,
   ClinicalProcessType,
   ClinicalProcessDetail,
@@ -268,7 +269,7 @@ export async function getAuthorizationState(): Promise<AuthorizationState> {
   return getAuthorizationStateForSession(session);
 }
 
-async function listCatsByArchiveState(archived: boolean): Promise<Cat[]> {
+async function listCatsByArchiveState(archived: boolean): Promise<CatCard[]> {
   const baseQuery = supabase
     .from("cats")
     .select("id, name, notes, birth_date, archived_at, created_at, updated_at")
@@ -282,7 +283,47 @@ async function listCatsByArchiveState(archived: boolean): Promise<Cat[]> {
     throw error;
   }
 
-  return (data ?? []).map(mapCatRow);
+  const cats = (data ?? []).map(mapCatRow);
+  const catIds = cats.map((cat) => cat.id);
+
+  if (!catIds.length) {
+    return [];
+  }
+
+  const { data: photoRows, error: photoError } = await supabase
+    .from("attachments")
+    .select("cat_id, bucket, storage_path")
+    .in("cat_id", catIds)
+    .eq("is_primary_for_cat", true)
+    .eq("file_kind", "image")
+    .is("removed_at", null);
+
+  if (photoError) {
+    throw photoError;
+  }
+
+  const signedUrlMap = await createSignedUrlMap(
+    ((photoRows as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
+      bucket: row.bucket,
+      storage_path: row.storage_path,
+    })),
+  );
+
+  const photoUrlByCatId = new Map<string, string>();
+
+  for (const row of (photoRows as Array<Record<string, unknown>> | null) ?? []) {
+    const key = `${String(row.bucket)}:${String(row.storage_path)}`;
+    const signedUrl = signedUrlMap.get(key) ?? null;
+
+    if (signedUrl) {
+      photoUrlByCatId.set(String(row.cat_id), signedUrl);
+    }
+  }
+
+  return cats.map((cat) => ({
+    ...cat,
+    primary_photo_url: photoUrlByCatId.get(cat.id) ?? null,
+  }));
 }
 
 export function listActiveCats() {
