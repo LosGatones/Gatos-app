@@ -34,6 +34,7 @@ import type {
   UpdateEventCostInput,
   UpdateClinicalProcessTypeInput,
   UpdateCatInput,
+  VoidEventInput,
 } from "@/domain/types";
 import { supabase } from "@/lib/supabase/client";
 
@@ -356,13 +357,25 @@ export async function setCatArchivedState(catId: string, archived: boolean): Pro
   return mapCatRow(data);
 }
 
+export async function deleteArchivedCat(catId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("delete_archived_cat", {
+    p_cat_id: catId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
+}
+
 export async function getCatDetail(catId: string): Promise<CatDetail | null> {
   const [
     { data: catRow, error: catError },
     { data: photoRow, error: photoError },
     { data: attachmentRows, error: attachmentError },
     { data: timelineRows, error: timelineError },
-    { data: costRows, error: costError },
+    { data: costRow, error: costError },
   ] = await Promise.all([
     supabase
       .from("cats")
@@ -399,9 +412,10 @@ export async function getCatDetail(catId: string): Promise<CatDetail | null> {
       .order("event_at", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase
-      .from("event_cat_costs")
-      .select("amount")
-      .eq("cat_id", catId),
+      .from("cat_cost_totals")
+      .select("total_amount")
+      .eq("cat_id", catId)
+      .maybeSingle(),
   ]);
 
   if (catError) {
@@ -453,14 +467,10 @@ export async function getCatDetail(catId: string): Promise<CatDetail | null> {
     timeline: (timelineRows ?? []).map((row) =>
       mapCatTimelineRow(row as Record<string, unknown>, catId),
     ),
-    cost_total_amount: (costRows ?? []).length
-      ? roundAmount(
-          (costRows ?? []).reduce((sum, row) => {
-            const value = typeof row.amount === "number" ? row.amount : Number(row.amount ?? 0);
-            return sum + value;
-          }, 0),
-        )
-      : null,
+    cost_total_amount:
+      costRow?.total_amount === 0 || costRow?.total_amount
+        ? roundAmount(Number(costRow.total_amount))
+        : null,
   };
 }
 
@@ -824,7 +834,7 @@ export async function getEventCostDraft(eventId: string): Promise<EventCostDraft
     { data: costRow, error: costError },
     { data: allocationRows, error: allocationError },
   ] = await Promise.all([
-    supabase.from("events").select("id").eq("id", eventId).maybeSingle(),
+    supabase.from("events").select("id").eq("id", eventId).is("voided_at", null).maybeSingle(),
     supabase
       .from("event_cats")
       .select("cat_id, cats!inner(id, name)")
@@ -908,4 +918,16 @@ export async function updateEventCost(input: UpdateEventCostInput): Promise<void
   if (error) {
     throw error;
   }
+}
+
+export async function voidEvent(input: VoidEventInput): Promise<string> {
+  const { data, error } = await supabase.rpc("void_event", {
+    p_event_id: input.event_id,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
 }

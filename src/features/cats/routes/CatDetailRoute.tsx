@@ -15,6 +15,7 @@ import {
   updateCat,
   uploadCatAttachment,
   uploadCatPrimaryPhoto,
+  voidEvent,
 } from "@/data/queries";
 
 function formatDate(date: string) {
@@ -183,6 +184,8 @@ export function CatDetailRoute() {
   );
   const [editingSharedTotalAmount, setEditingSharedTotalAmount] = useState("");
   const [editingPerCatAmounts, setEditingPerCatAmounts] = useState<Record<string, string>>({});
+  const [timelineActionError, setTimelineActionError] = useState<string | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
   const catDetailQuery = useQuery({
     queryKey: ["cats", "detail", catId],
@@ -378,6 +381,22 @@ export function CatDetailRoute() {
     },
   });
 
+  const voidEventMutation = useMutation({
+    mutationFn: voidEvent,
+    onSuccess: async () => {
+      setTimelineActionError(null);
+      setDeletingEventId(null);
+      setEditingCostEventId(null);
+      await queryClient.invalidateQueries({ queryKey: ["cats"] });
+      await queryClient.invalidateQueries({ queryKey: ["cats", "detail"] });
+      await queryClient.invalidateQueries({ queryKey: ["cats", "detail", catId] });
+      await queryClient.invalidateQueries({ queryKey: ["processes"] });
+    },
+    onError: (error: Error) => {
+      setTimelineActionError(error.message);
+    },
+  });
+
   const uploadPrimaryPhotoMutation = useMutation({
     mutationFn: (file: File) => uploadCatPrimaryPhoto(catId ?? "", file),
     onSuccess: async () => {
@@ -528,6 +547,20 @@ export function CatDetailRoute() {
 
     setAttachmentError(null);
     uploadAttachmentMutation.mutate(attachmentFile);
+  }
+
+  function handleDeleteEvent(eventId: string) {
+    const confirmed = window.confirm(
+      "Este registro se ocultara del timeline y dejara de contar en costos, pero seguira en la bitacora interna. ¿Quieres eliminarlo?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setTimelineActionError(null);
+    setDeletingEventId(eventId);
+    voidEventMutation.mutate({ event_id: eventId });
   }
 
   if (!catId) {
@@ -981,9 +1014,14 @@ export function CatDetailRoute() {
                 <div className="timeline">
                   {cat.timeline.map((item) => {
                     const isEditingCost = editingCostEventId === item.id;
+                    const isDeleting = deletingEventId === item.id;
                     const itemCost = item.cost;
                     const itemCurrency = itemCost?.currency_code ?? "MXN";
                     const kindLabel = getProcessKindLabel(item.process_event_kind);
+                    const canDelete =
+                      !isArchived &&
+                      !item.is_process_header &&
+                      item.process_closed_event_id !== item.id;
 
                     return (
                       <article
@@ -1015,20 +1053,34 @@ export function CatDetailRoute() {
                               Ver seguimiento
                             </Link>
                           ) : !isArchived ? (
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              onClick={() => {
-                                setEditingCostError(null);
-                                setEditingCostEventId((current) => (current === item.id ? null : item.id));
-                              }}
-                            >
-                              {isEditingCost
-                                ? "Cerrar costo"
-                                : itemCost && itemCost.mode !== "none"
-                                  ? "Editar costo"
-                                  : "Agregar costo"}
-                            </button>
+                            <div className="timeline__actions">
+                              <button
+                                className="button button--ghost button--small"
+                                type="button"
+                                onClick={() => {
+                                  setTimelineActionError(null);
+                                  setEditingCostError(null);
+                                  setEditingCostEventId((current) => (current === item.id ? null : item.id));
+                                }}
+                                disabled={isDeleting}
+                              >
+                                {isEditingCost
+                                  ? "Cerrar costo"
+                                  : itemCost && itemCost.mode !== "none"
+                                    ? "Editar costo"
+                                    : "Agregar costo"}
+                              </button>
+                              {canDelete ? (
+                                <button
+                                  className="button button--ghost button--danger button--small"
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(item.id)}
+                                  disabled={voidEventMutation.isPending}
+                                >
+                                  {voidEventMutation.isPending && isDeleting ? "Eliminando..." : "Eliminar"}
+                                </button>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                         <p className="muted timeline__labels">
@@ -1049,6 +1101,9 @@ export function CatDetailRoute() {
                           <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
                             Ver seguimiento: {item.process_title ?? "Proceso clinico"}
                           </Link>
+                        ) : null}
+                        {isDeleting && timelineActionError ? (
+                          <p className="error">{timelineActionError}</p>
                         ) : null}
                         {isEditingCost ? (
                           <form className="cost-editor" onSubmit={handleEditCostSubmit}>

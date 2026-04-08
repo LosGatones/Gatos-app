@@ -8,6 +8,7 @@ import {
   getClinicalProcessDetail,
   getEventCostDraft,
   updateEventCost,
+  voidEvent,
 } from "@/data/queries";
 
 function formatDate(date: string) {
@@ -79,6 +80,8 @@ export function ProcessDetailRoute() {
   );
   const [editingSharedTotalAmount, setEditingSharedTotalAmount] = useState("");
   const [editingPerCatAmount, setEditingPerCatAmount] = useState("");
+  const [timelineActionError, setTimelineActionError] = useState<string | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
   const processQuery = useQuery({
     queryKey: ["processes", "detail", processId],
@@ -161,6 +164,21 @@ export function ProcessDetailRoute() {
     },
     onError: (error: Error) => {
       setCloseError(error.message);
+    },
+  });
+
+  const voidEventMutation = useMutation({
+    mutationFn: voidEvent,
+    onSuccess: async () => {
+      setTimelineActionError(null);
+      setDeletingEventId(null);
+      setEditingCostEventId(null);
+      await queryClient.invalidateQueries({ queryKey: ["processes", "detail", processId] });
+      await queryClient.invalidateQueries({ queryKey: ["cats", "detail", catId] });
+      await queryClient.invalidateQueries({ queryKey: ["cats"] });
+    },
+    onError: (error: Error) => {
+      setTimelineActionError(error.message);
     },
   });
 
@@ -268,6 +286,20 @@ export function ProcessDetailRoute() {
       notes: closeNotes,
       event_at: new Date(closeEventAt).toISOString(),
     });
+  }
+
+  function handleDeleteEvent(eventId: string) {
+    const confirmed = window.confirm(
+      "Este registro se ocultara de la subtimeline y dejara de contar en costos, pero seguira en la bitacora interna. ¿Quieres eliminarlo?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setTimelineActionError(null);
+    setDeletingEventId(eventId);
+    voidEventMutation.mutate({ event_id: eventId });
   }
 
   if (!catId || !processId) {
@@ -557,6 +589,11 @@ export function ProcessDetailRoute() {
                 const itemCurrency = itemCost?.currency_code ?? "MXN";
                 const kindLabel = item.process_event_kind ? getKindLabel(item.process_event_kind) : null;
                 const isEditingCost = editingCostEventId === item.id;
+                const isDeleting = deletingEventId === item.id;
+                const canDelete =
+                  !isArchived &&
+                  !item.is_process_header &&
+                  item.process_closed_event_id !== item.id;
 
                 return (
                   <article
@@ -583,20 +620,34 @@ export function ProcessDetailRoute() {
                         ) : null}
                       </div>
                       {!item.is_process_header && !isArchived ? (
-                        <button
-                          className="button button--ghost button--small"
-                          type="button"
-                          onClick={() => {
-                            setEditingCostError(null);
-                            setEditingCostEventId((current) => (current === item.id ? null : item.id));
-                          }}
-                        >
-                          {isEditingCost
-                            ? "Cerrar costo"
-                            : itemCost && itemCost.mode !== "none"
-                              ? "Editar costo"
-                              : "Agregar costo"}
-                        </button>
+                        <div className="timeline__actions">
+                          <button
+                            className="button button--ghost button--small"
+                            type="button"
+                            onClick={() => {
+                              setTimelineActionError(null);
+                              setEditingCostError(null);
+                              setEditingCostEventId((current) => (current === item.id ? null : item.id));
+                            }}
+                            disabled={isDeleting}
+                          >
+                            {isEditingCost
+                              ? "Cerrar costo"
+                              : itemCost && itemCost.mode !== "none"
+                                ? "Editar costo"
+                                : "Agregar costo"}
+                          </button>
+                          {canDelete ? (
+                            <button
+                              className="button button--ghost button--danger button--small"
+                              type="button"
+                              onClick={() => handleDeleteEvent(item.id)}
+                              disabled={voidEventMutation.isPending}
+                            >
+                              {voidEventMutation.isPending && isDeleting ? "Eliminando..." : "Eliminar"}
+                            </button>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                     {item.notes ? <p>{item.notes}</p> : null}
@@ -608,6 +659,7 @@ export function ProcessDetailRoute() {
                       </p>
                     ) : null}
 
+                    {isDeleting && timelineActionError ? <p className="error">{timelineActionError}</p> : null}
                     {isEditingCost ? (
                       <form className="cost-editor" onSubmit={handleEditCostSubmit}>
                         {eventCostDraftQuery.isLoading ? <p className="muted">Cargando costo...</p> : null}

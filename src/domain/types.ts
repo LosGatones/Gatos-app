@@ -254,6 +254,10 @@ export type UpdateEventCostInput = {
   cost: EventCostInput;
 };
 
+export type VoidEventInput = {
+  event_id: string;
+};
+
 export type EventCostSummary = {
   mode: EventCostMode;
   currency_code: string | null;

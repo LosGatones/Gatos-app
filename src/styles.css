@@ -410,6 +410,20 @@ p {
   box-shadow: none;
 }
 
+.button--danger {
+  background:
+    linear-gradient(180deg, rgba(157, 43, 43, 0.96), rgba(129, 31, 31, 0.98));
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(129, 31, 31, 0.16);
+}
+
+.button--ghost.button--danger {
+  background: rgba(157, 43, 43, 0.08);
+  color: #8d2424;
+  border-color: rgba(157, 43, 43, 0.16);
+  box-shadow: none;
+}
+
 .muted {
   color: var(--color-text-soft);
 }
@@ -633,6 +647,14 @@ p {
   gap: 1rem;
 }
 
+.timeline__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .timeline__meta {
   display: flex;
   justify-content: space-between;
@@ -850,9 +872,37 @@ p {
   padding: 1rem 1.05rem;
 }
 
+.list-card--archived {
+  display: grid;
+  gap: 0.9rem;
+}
+
 .list-card__content {
   display: grid;
   gap: 0.2rem;
+}
+
+.archive-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(60, 35, 85, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.dialog-card {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 1rem;
+  box-shadow: var(--shadow-float);
 }
 
 .login-shell {
@@ -913,8 +963,10 @@ p {
   }
 
   .process-actions,
+  .timeline__actions,
   .catalog-row,
-  .catalog-row__actions {
+  .catalog-row__actions,
+  .archive-card__actions {
     align-items: flex-start;
     flex-direction: column;
   }
