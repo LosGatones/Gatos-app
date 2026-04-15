@@ -53,116 +53,173 @@ export function CatsRoute() {
     });
   }
 
+  const cats = catsQuery.data ?? [];
+  const featuredCat = cats[0] ?? null;
+
   return (
     <section className="page">
-      <section className="panel cats-hero surface-hero">
-        <div className="cats-hero__copy">
+      <section className="panel cats-stage surface-hero">
+        <div className="cats-stage__backdrop" aria-hidden="true" />
+
+        <div className="cats-stage__intro">
           <span className="eyebrow">Perfiles activos</span>
-          <h1>Gatos</h1>
+          <h1>Una galeria viva para abrir cada historia desde su cara y su ritmo.</h1>
           <p className="muted">
-            Entra a cada perfil para leer su actividad como un feed cronologico y seguir lo importante sin perder contexto.
+            Esta entrada deja de sentirse administrativa: primero ves perfiles, contexto y acceso directo al feed; la captura queda disponible, pero ya no domina la pantalla.
           </p>
-          <div className="cats-hero__stats">
-            <div className="cats-hero__stat">
-              <strong>{catsQuery.data?.length ?? 0}</strong>
-              <span>Perfiles activos</span>
+
+          <div className="cats-stage__metrics">
+            <div className="cats-stage__metric">
+              <span>Activos</span>
+              <strong>{cats.length}</strong>
             </div>
-            <div className="cats-hero__stat">
+            <div className="cats-stage__metric">
+              <span>Espacio</span>
               <strong>Privado</strong>
-              <span>Registro compartido entre dos personas</span>
+            </div>
+            <div className="cats-stage__metric">
+              <span>Lectura</span>
+              <strong>Perfil + feed</strong>
             </div>
           </div>
         </div>
 
-        <section className="panel panel--subtle panel--section cats-create-card">
-          <div>
-            <span className="eyebrow">Alta rapida</span>
-            <h2>Nuevo perfil</h2>
-            <p className="muted">Captura minima para empezar a registrar actividad.</p>
-          </div>
-          <form className="form form--compact" onSubmit={handleSubmit}>
-            <div className="field">
-              <label htmlFor="cat-name">Nombre</label>
-              <input
-                id="cat-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Nombre del gato"
-                required
-              />
+        <div className="cats-stage__rail">
+          {featuredCat ? (
+            <Link className="cats-featured-card" to={`/cats/${featuredCat.id}`}>
+              <div className="cats-featured-card__media" aria-hidden="true">
+                {featuredCat.primary_photo_url ? (
+                  <img src={featuredCat.primary_photo_url} alt="" />
+                ) : (
+                  <div className="cats-featured-card__avatar">{getInitials(featuredCat.name)}</div>
+                )}
+              </div>
+              <div className="cats-featured-card__body">
+                <span className="eyebrow">Entrada sugerida</span>
+                <h2>{featuredCat.name}</h2>
+                <p className="muted clamp-two-lines">
+                  {featuredCat.notes ?? "Perfil listo para abrir timeline, media y seguimientos."}
+                </p>
+                <div className="cats-featured-card__meta">
+                  <span className="status status--soft">Activo</span>
+                  <span className="profile-inline-pill">
+                    {featuredCat.primary_photo_url ? "Con foto principal" : "Sin foto principal"}
+                  </span>
+                </div>
+                <span className="status-link">Abrir perfil</span>
+              </div>
+            </Link>
+          ) : (
+            <div className="cats-featured-card cats-featured-card--empty">
+              <span className="eyebrow">Listo para empezar</span>
+              <h2>El primer perfil aparecera aqui</h2>
+              <p className="muted">
+                En cuanto registres un gato, tendras un acceso principal al perfil y su timeline.
+              </p>
             </div>
-            <div className="field">
-              <label htmlFor="cat-notes">Notas</label>
-              <textarea
-                id="cat-notes"
-                rows={3}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Notas generales"
-              />
+          )}
+
+          <section className="panel panel--subtle panel--section cats-quickform">
+            <div className="cats-quickform__intro">
+              <span className="eyebrow">Alta rapida</span>
+              <h2>Nuevo perfil</h2>
+              <p className="muted">
+                Solo nombre y contexto breve. El resto vive dentro del perfil.
+              </p>
             </div>
-            {localError ? <p className="error">{localError}</p> : null}
-            <div className="actions">
-              <button className="button" type="submit" disabled={createCatMutation.isPending}>
-                {createCatMutation.isPending ? "Guardando..." : "Crear gato"}
-              </button>
-            </div>
-          </form>
-        </section>
+            <form className="form form--compact" onSubmit={handleSubmit}>
+              <div className="field">
+                <label htmlFor="cat-name">Nombre</label>
+                <input
+                  id="cat-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Ej. Luna"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="cat-notes">Notas iniciales</label>
+                <textarea
+                  id="cat-notes"
+                  rows={3}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Caracter, contexto o detalle breve"
+                />
+              </div>
+              {localError ? <p className="error">{localError}</p> : null}
+              <div className="actions actions--stretch-mobile">
+                <button className="button" type="submit" disabled={createCatMutation.isPending}>
+                  {createCatMutation.isPending ? "Guardando..." : "Crear perfil"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
       </section>
 
-      <div className="page-intro page-intro--inline">
+      <div className="page-intro page-intro--inline page-intro--split page-intro--gallery">
         <div>
-          <h2>Perfiles</h2>
-          <p className="muted">Cada card funciona como acceso rapido al perfil y timeline de cada gato.</p>
+          <span className="eyebrow">Galeria principal</span>
+          <h2>Perfiles listos para abrir</h2>
+          <p className="muted">
+            Las tarjetas ahora priorizan rostro, estado y acceso. Menos panel administrativo, mas presencia de perfil.
+          </p>
+        </div>
+        <div className="page-intro__meta">
+          <span className="status status--neutral">Privado entre 2 personas</span>
+          <span className="status status--soft">{cats.length} activos</span>
         </div>
       </div>
 
-      <div className="cats-grid">
+      <div className="cats-gallery">
         {catsQuery.isLoading ? (
-          <div className="panel panel--subtle">
+          <div className="panel panel--subtle empty-state empty-state--tight">
             <p className="muted">Cargando gatos...</p>
           </div>
         ) : null}
         {catsQuery.isError ? (
-          <div className="panel panel--subtle">
+          <div className="panel panel--subtle empty-state empty-state--tight">
             <p className="error">No fue posible cargar los gatos.</p>
           </div>
         ) : null}
         {!catsQuery.isLoading && !catsQuery.isError && !catsQuery.data?.length ? (
-          <div className="panel panel--subtle empty-state">
-            <h2>No hay gatos activos</h2>
-            <p className="muted">Cuando registres un gato, aparecera aqui.</p>
+          <div className="panel panel--subtle empty-state cats-empty-state">
+            <span className="eyebrow">Todavia vacio</span>
+            <h2>No hay perfiles activos</h2>
+            <p className="muted">Cuando registres un gato, aparecera aqui con acceso directo a su perfil y timeline.</p>
           </div>
         ) : null}
-        {catsQuery.data?.map((cat) => (
-          <Link className="panel panel--subtle profile-card" key={cat.id} to={`/cats/${cat.id}`}>
-            <div className="profile-card__media" aria-hidden="true">
+        {cats.map((cat, index) => (
+          <Link className="profile-hero-card" key={cat.id} to={`/cats/${cat.id}`}>
+            <div className="profile-hero-card__media" aria-hidden="true">
               {cat.primary_photo_url ? (
                 <img src={cat.primary_photo_url} alt="" />
               ) : (
-                <div className="profile-card__avatar">{getInitials(cat.name)}</div>
+                <div className="profile-hero-card__avatar">{getInitials(cat.name)}</div>
               )}
             </div>
-            <div className="profile-card__body">
-              <div className="profile-card__head">
-                <div className="list-card__content">
-                  <strong>{cat.name}</strong>
-                  <p className="muted clamp-two-lines">{cat.notes ?? "Sin notas todavia."}</p>
-                </div>
+            <div className="profile-hero-card__shade" aria-hidden="true" />
+            <div className="profile-hero-card__body">
+              <div className="profile-hero-card__head">
+                <span className="eyebrow">Perfil {String(index + 1).padStart(2, "0")}</span>
                 <span className="status status--soft">Activo</span>
               </div>
-              <div className="profile-card__details">
-                <span className="profile-card__label">Perfil privado</span>
-                <span className="profile-card__label">Timeline disponible</span>
+              <div className="profile-hero-card__title">
+                <strong>{cat.name}</strong>
+                <p className="muted clamp-two-lines">{cat.notes ?? "Sin notas todavia."}</p>
               </div>
-              <div className="profile-card__submeta">
-                <span className="profile-card__pill">Perfil y feed</span>
-                <span className="profile-card__date">Desde {formatJoinedDate(cat.created_at)}</span>
+              <div className="profile-hero-card__tags">
+                <span className="profile-hero-card__tag">Perfil privado</span>
+                <span className="profile-hero-card__tag">Feed cronologico</span>
+                <span className="profile-hero-card__tag">
+                  {cat.primary_photo_url ? "Con foto" : "Sin foto"}
+                </span>
               </div>
-              <div className="profile-card__footer">
-                <span className="profile-card__meta">Entrar al perfil</span>
-                <span className="status-link">Abrir</span>
+              <div className="profile-hero-card__footer">
+                <span className="profile-hero-card__date">Desde {formatJoinedDate(cat.created_at)}</span>
+                <span className="status-link">Entrar al perfil</span>
               </div>
             </div>
           </Link>

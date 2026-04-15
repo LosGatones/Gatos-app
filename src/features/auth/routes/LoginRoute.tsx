@@ -57,7 +57,7 @@ export function LoginRoute() {
   );
 
   return (
-    <main className="shell__main login-shell">
+    <main className="shell__main login-shell" id="main-content">
       <section className="panel login-card stack surface-hero">
         <div>
           <span className="eyebrow">Acceso privado</span>
@@ -77,7 +77,7 @@ export function LoginRoute() {
             />
           </div>
           <div className="field">
-            <label htmlFor="password">Contraseña</label>
+            <label htmlFor="password">Contrasena</label>
             <input
               id="password"
               name="password"
@@ -87,8 +87,8 @@ export function LoginRoute() {
               onChange={(event) => setPassword(event.target.value)}
             />
           </div>
-          {denied ? <p className="error">Tu usuario no tiene acceso a esta app.</p> : null}
-          {localError ? <p className="error">{localError}</p> : null}
+          {denied ? <p className="error" role="alert">Tu usuario no tiene acceso a esta app.</p> : null}
+          {localError ? <p className="error" role="alert">{localError}</p> : null}
           <div className="actions">
             <button className="button" type="submit" disabled={signInMutation.isPending}>
               {signInMutation.isPending ? "Entrando..." : "Entrar"}

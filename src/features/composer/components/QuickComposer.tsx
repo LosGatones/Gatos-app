@@ -251,6 +251,7 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
       : selectedCats.length === 1
         ? `Se publicara en el perfil de ${selectedCats[0]?.name}.`
         : `Se publicara en ${selectedCats.length} perfiles: ${selectedCats.map((cat) => cat.name).join(", ")}.`;
+  const processSelectedCat = activeCats.find((cat) => cat.id === processCatId) ?? null;
 
   return (
     <>
@@ -317,11 +318,27 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
 
             {mode === "event" ? (
               <form className="composer-form" onSubmit={handleEventSubmit}>
+                <section className="composer-section composer-section--hero">
+                  <div className="composer-hero-card">
+                    <div className="composer-hero-card__copy">
+                      <span className="eyebrow">Registro rapido</span>
+                      <h3>Publica un evento sin salir del timeline</h3>
+                      <p className="muted">
+                        Primero eliges a quien afecta, luego capturas el contexto y por ultimo agregas costo solo si aplica.
+                      </p>
+                    </div>
+                    <div className="composer-summary-card composer-summary-card--hero">
+                      <strong>Resumen</strong>
+                      <p className="muted">{selectedCatsSummary}</p>
+                    </div>
+                  </div>
+                </section>
+
                 <section className="composer-section">
                   <div className="composer-section__head">
                     <div>
                       <h3>Perfiles afectados</h3>
-                      <p className="muted">Toca para seleccionar o quitar perfiles.</p>
+                      <p className="muted">Toca para incluir o quitar perfiles del mismo evento.</p>
                     </div>
                     <span className="composer-counter">
                       {selectedCatIds.length} seleccionad{selectedCatIds.length === 1 ? "o" : "os"}
@@ -344,13 +361,15 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
                       );
                     })}
                   </div>
-                  <div className="composer-summary-card">
-                    <strong>Resumen rapido</strong>
-                    <p className="muted">{selectedCatsSummary}</p>
-                  </div>
                 </section>
 
                 <section className="composer-section composer-section--compact">
+                  <div className="composer-section__head">
+                    <div>
+                      <h3>Detalle del evento</h3>
+                      <p className="muted">La captura estructurada va primero y las notas amplian el contexto.</p>
+                    </div>
+                  </div>
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="composer-event-title">Titulo</label>
@@ -431,7 +450,7 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
                   <div className="composer-section__head">
                     <div>
                       <h3>Costo</h3>
-                      <p className="muted">Secundario, pero claro cuando aplique.</p>
+                      <p className="muted">Secundario, pero bien resuelto cuando el evento lo necesita.</p>
                     </div>
                   </div>
 
@@ -518,6 +537,26 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
               </form>
             ) : (
               <form className="composer-form" onSubmit={handleProcessSubmit}>
+                <section className="composer-section composer-section--hero">
+                  <div className="composer-hero-card">
+                    <div className="composer-hero-card__copy">
+                      <span className="eyebrow">Seguimiento clinico</span>
+                      <h3>Inicia un hilo especial para un solo perfil</h3>
+                      <p className="muted">
+                        Los seguimientos viven dentro del historial del gato, pero mantienen su propia subtimeline para leer el caso completo.
+                      </p>
+                    </div>
+                    <div className="composer-summary-card composer-summary-card--hero">
+                      <strong>Perfil elegido</strong>
+                      <p className="muted">
+                        {processSelectedCat
+                          ? `${processSelectedCat.name} recibira este seguimiento.`
+                          : "Elige primero el perfil para abrir el seguimiento."}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
                 <section className="composer-section">
                   <div className="composer-section__head">
                     <div>
@@ -545,6 +584,12 @@ export function QuickComposer({ currentCatId }: QuickComposerProps) {
                 </section>
 
                 <section className="composer-section composer-section--compact">
+                  <div className="composer-section__head">
+                    <div>
+                      <h3>Datos de apertura</h3>
+                      <p className="muted">Define el tipo, el momento de apertura y el contexto inicial.</p>
+                    </div>
+                  </div>
                   <div className="form-grid">
                     <div className="field">
                       <label htmlFor="composer-process-type">Tipo de proceso</label>

@@ -53,6 +53,18 @@ function getKindLabel(kind: ProcessEventKind) {
   return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
+function formatFeedDay(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+  }).format(new Date(date));
+}
+
+function formatFeedMonth(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    month: "short",
+  }).format(new Date(date));
+}
+
 export function ProcessDetailRoute() {
   const params = useParams();
   const catId = params.catId;
@@ -333,11 +345,14 @@ export function ProcessDetailRoute() {
   const process = processQuery.data;
   const isArchived = Boolean(process.cat.archived_at);
   const isClosed = Boolean(process.closed_at);
+  const visibleTimelineCount = process.timeline.length;
+  const processCostTotal = process.timeline.reduce((sum, item) => sum + (item.cost?.cat_amount ?? 0), 0);
+  const latestEntry = process.timeline[0] ?? null;
 
   return (
     <section className="page">
-      <div className="panel stack stack--airy surface-hero">
-        <div className="process-header">
+      <div className="panel stack stack--airy surface-hero cat-detail-shell--profile">
+        <div className="process-header process-header--hero">
           <div className="stack stack--compact hero-card__title">
             <Link className="back-link" to={`/cats/${process.cat.id}`}>
               Volver a {process.cat.name}
@@ -352,35 +367,68 @@ export function ProcessDetailRoute() {
                 <p className="muted">Cerrado el {formatDate(process.closed_at)}</p>
               ) : null}
             </div>
+            <div className="cat-detail-hero__actions">
+              <a className="button button--ghost button--small" href="#process-subtimeline">
+                Ver subtimeline
+              </a>
+              {!isClosed && !isArchived ? (
+                <a className="button button--ghost button--small" href="#new-process-entry">
+                  Agregar registro
+                </a>
+              ) : null}
+            </div>
           </div>
-          <div className="process-actions">
-            <span className={`status ${isClosed ? "status--neutral" : ""}`}>
-              {isClosed ? "Cerrado" : "Abierto"}
-            </span>
-            {!isArchived && !isClosed ? (
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={() => {
-                  setCloseFormVisible((current) => !current);
-                  setCloseError(null);
-                }}
-                disabled={closeProcessMutation.isPending}
-              >
-                {closeFormVisible ? "Cancelar cierre" : "Cerrar proceso"}
-              </button>
-            ) : null}
+          <div className="cat-profile-quickpanel cat-profile-quickpanel--hero">
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Estado</span>
+              <strong>{isClosed ? "Cerrado" : "Abierto"}</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Entradas</span>
+              <strong>{visibleTimelineCount}</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Perfil</span>
+              <strong>{process.cat.name}</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Costo visible</span>
+              <strong>{processCostTotal > 0 ? formatMoney(processCostTotal) : "Sin costo"}</strong>
+            </div>
           </div>
         </div>
 
+        <div className="process-actions">
+          <span className={`status ${isClosed ? "status--neutral" : ""}`}>
+            {isClosed ? "Cerrado" : "Abierto"}
+          </span>
+          {!isArchived && !isClosed ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                setCloseFormVisible((current) => !current);
+                setCloseError(null);
+              }}
+              disabled={closeProcessMutation.isPending}
+            >
+              {closeFormVisible ? "Cancelar cierre" : "Cerrar proceso"}
+            </button>
+          ) : null}
+        </div>
+
         {process.notes ? (
-          <section className="panel panel--subtle panel--section">
+          <section className="panel panel--subtle panel--section process-intro-card">
+            <div className="section-shell__head">
+              <span className="eyebrow">Contexto inicial</span>
+              <h2>Resumen del seguimiento</h2>
+            </div>
             <p>{process.notes}</p>
           </section>
         ) : null}
 
         {closeFormVisible ? (
-          <section className="panel panel--subtle panel--section stack stack--compact">
+          <section className="panel panel--subtle panel--section stack stack--compact" id="new-process-entry">
             <div className="section-header">
               <div>
                 <h2>Cerrar proceso</h2>
@@ -573,10 +621,29 @@ export function ProcessDetailRoute() {
           </form>
         </section>
 
-        <section className="section-shell">
-          <div className="section-shell__head">
+        <section className="section-shell" id="process-subtimeline">
+          <div className="section-shell__head feed-head">
+            <div>
             <span className="eyebrow">Historial</span>
             <h2>Subtimeline</h2>
+            </div>
+            <p className="muted">
+              Este hilo conserva el contexto del seguimiento completo y muestra cada paso en orden cronologico inverso.
+            </p>
+          </div>
+          <div className="feed-summary-strip feed-summary-strip--process">
+            <div className="feed-summary-strip__item">
+              <span>Ultimo movimiento</span>
+              <strong>{latestEntry ? formatDate(latestEntry.event_at) : "Sin registros"}</strong>
+            </div>
+            <div className="feed-summary-strip__item">
+              <span>Entradas</span>
+              <strong>{visibleTimelineCount}</strong>
+            </div>
+            <div className="feed-summary-strip__item">
+              <span>Estado</span>
+              <strong>{isClosed ? "Proceso cerrado" : "Proceso activo"}</strong>
+            </div>
           </div>
           {!process.timeline.length ? (
             <div className="panel panel--subtle empty-state empty-state--tight">
@@ -600,8 +667,16 @@ export function ProcessDetailRoute() {
                     className={`timeline__item ${item.is_process_header ? "timeline__item--process" : ""}`}
                     key={item.id}
                   >
+                    <div className="timeline-story">
+                      <div className="timeline-story__date">
+                        <span className="timeline-story__day">{formatFeedDay(item.event_at)}</span>
+                        <span className="timeline-story__month">{formatFeedMonth(item.event_at)}</span>
+                        <span className="timeline-story__time">
+                          {item.time_kind === "scheduled" ? "Programado" : "Registrado"}
+                        </span>
+                      </div>
+                      <div className="timeline-story__content">
                     <div className="timeline__meta">
-                      <span>{item.time_kind === "scheduled" ? "Programado" : "Registrado"}</span>
                       <span>{formatDate(item.event_at)}</span>
                     </div>
                     <div className="timeline__header">
@@ -650,16 +725,18 @@ export function ProcessDetailRoute() {
                         </div>
                       ) : null}
                     </div>
-                    {item.notes ? <p>{item.notes}</p> : null}
+                    {item.notes ? <p className="timeline__narrative">{item.notes}</p> : null}
                     {itemCost && itemCost.mode !== "none" && itemCost.cat_amount !== null ? (
                       <p className="timeline__cost">
                         {itemCost.mode === "shared_total" && itemCost.total_amount !== null
                           ? `${formatMoney(itemCost.cat_amount, itemCurrency)} para ${process.cat.name} · total ${formatMoney(itemCost.total_amount, itemCurrency)}`
                           : `${formatMoney(itemCost.cat_amount, itemCurrency)} para ${process.cat.name}`}
                       </p>
-                    ) : null}
+                    ) : <span className="timeline__quiet">Sin costo visible</span>}
 
                     {isDeleting && timelineActionError ? <p className="error">{timelineActionError}</p> : null}
+                      </div>
+                    </div>
                     {isEditingCost ? (
                       <form className="cost-editor" onSubmit={handleEditCostSubmit}>
                         {eventCostDraftQuery.isLoading ? <p className="muted">Cargando costo...</p> : null}

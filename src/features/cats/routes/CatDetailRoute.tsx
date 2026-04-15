@@ -92,6 +92,25 @@ function formatShortDate(date: string) {
   }).format(new Date(date));
 }
 
+function formatMonthLabel(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+function formatFeedDay(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+  }).format(new Date(date));
+}
+
+function formatFeedMonth(date: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    month: "short",
+  }).format(new Date(date));
+}
+
 function getBirthdayMetrics(birthDate: string | null) {
   if (!birthDate) {
     return null;
@@ -617,11 +636,40 @@ export function CatDetailRoute() {
   const isArchived = Boolean(cat.archived_at);
   const showCostTotal = (cat.cost_total_amount ?? 0) > 0;
   const birthdayMetrics = getBirthdayMetrics(cat.birth_date);
+  const openProcessCount = cat.timeline.filter(
+    (item) => item.is_process_header && !item.process_closed_at,
+  ).length;
+  const timelineCountLabel = `${cat.timeline.length} ${cat.timeline.length === 1 ? "entrada" : "entradas"} visibles`;
+  const latestTimelineEntry = cat.timeline[0] ?? null;
+  const timelineGroups = cat.timeline.reduce<
+    Array<{
+      key: string;
+      label: string;
+      items: typeof cat.timeline;
+    }>
+  >((groups, item) => {
+    const date = new Date(item.event_at);
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    const current = groups[groups.length - 1];
+
+    if (current?.key === key) {
+      current.items.push(item);
+      return groups;
+    }
+
+    groups.push({
+      key,
+      label: formatMonthLabel(item.event_at),
+      items: [item],
+    });
+
+    return groups;
+  }, []);
 
   return (
     <section className="page">
-      <div className="panel stack stack--airy surface-hero cat-detail-shell">
-        <div className="detail-header hero-card__top">
+      <div className="panel stack stack--airy surface-hero cat-detail-shell cat-detail-shell--profile">
+        <div className="detail-header hero-card__top cat-detail-hero">
           <div className="cat-profile-header">
             <div className="cat-profile-header__avatar">
               {cat.primary_photo?.signed_url ? (
@@ -642,7 +690,7 @@ export function CatDetailRoute() {
               <p className="muted">
                 {isArchived
                   ? "Registro en consulta. La captura queda bloqueada hasta reactivarlo."
-                  : "Perfil, feed cronologico y seguimiento general en una sola vista."}
+                  : "Perfil, feed cronologico y seguimiento general en una sola vista, pensado para leer primero y registrar despues."}
               </p>
               <div className="cat-profile-header__pills">
                 <span className={`status ${isArchived ? "status--neutral" : ""}`}>
@@ -653,16 +701,38 @@ export function CatDetailRoute() {
                 ) : null}
                 <span className="profile-inline-pill">Creado {formatShortDate(cat.created_at)}</span>
               </div>
+              <div className="cat-detail-hero__actions">
+                <a className="button button--ghost button--small" href="#cat-feed">
+                  Ver feed
+                </a>
+                <a className="button button--ghost button--small" href="#new-event">
+                  Registrar evento
+                </a>
+                <a className="button button--ghost button--small" href="#new-process">
+                  Nuevo seguimiento
+                </a>
+                <a className="button button--ghost button--small" href="#cat-media">
+                  Fotos y adjuntos
+                </a>
+              </div>
             </div>
           </div>
-          <div className="cat-profile-quickpanel">
+          <div className="cat-profile-quickpanel cat-profile-quickpanel--hero">
             <div className="cat-profile-quickpanel__item">
               <span className="detail-fact__label">Perfil</span>
               <strong>{isArchived ? "Solo consulta" : "Activo para registrar"}</strong>
             </div>
             <div className="cat-profile-quickpanel__item">
               <span className="detail-fact__label">Feed</span>
-              <strong>{cat.timeline.length} entradas visibles</strong>
+              <strong>{timelineCountLabel}</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Seguimientos</span>
+              <strong>{openProcessCount} abiertos</strong>
+            </div>
+            <div className="cat-profile-quickpanel__item">
+              <span className="detail-fact__label">Adjuntos</span>
+              <strong>{cat.attachments.length} visibles</strong>
             </div>
           </div>
         </div>
@@ -1051,202 +1121,236 @@ export function CatDetailRoute() {
                   <h2>Feed del perfil</h2>
                 </div>
                 <p className="muted">
-                  Lee primero el historial y baja a captura solo cuando necesites registrar algo nuevo.
+                  Esta es la lectura principal del perfil. Los costos se mantienen discretos y los seguimientos aparecen como hilos especiales dentro del mismo historial.
                 </p>
+              </div>
+              <div className="feed-summary-strip">
+                <div className="feed-summary-strip__item">
+                  <span>Ultima entrada</span>
+                  <strong>{latestTimelineEntry ? formatShortDate(latestTimelineEntry.event_at) : "Sin actividad"}</strong>
+                </div>
+                <div className="feed-summary-strip__item">
+                  <span>Seguimientos</span>
+                  <strong>{openProcessCount} abiertos</strong>
+                </div>
+                <div className="feed-summary-strip__item">
+                  <span>Modo</span>
+                  <strong>Lectura cronologica</strong>
+                </div>
               </div>
               {!cat.timeline.length ? (
                 <div className="panel panel--subtle empty-state empty-state--tight">
                   <p className="muted">Todavia no hay actividad registrada para este perfil.</p>
                 </div>
               ) : (
-                <div className="timeline timeline--feed">
-                  {cat.timeline.map((item) => {
-                    const isEditingCost = editingCostEventId === item.id;
-                    const isDeleting = deletingEventId === item.id;
-                    const itemCost = item.cost;
-                    const itemCurrency = itemCost?.currency_code ?? "MXN";
-                    const kindLabel = getProcessKindLabel(item.process_event_kind);
-                    const canDelete =
-                      !isArchived &&
-                      !item.is_process_header &&
-                      item.process_closed_event_id !== item.id;
+                <div className="timeline timeline--feed timeline--grouped">
+                  {timelineGroups.map((group) => (
+                    <section className="timeline-group" key={group.key}>
+                      <div className="timeline-group__header">
+                        <span className="timeline-group__label">{group.label}</span>
+                        <div className="timeline-group__rule" aria-hidden="true" />
+                      </div>
+                      <div className="timeline-group__items">
+                        {group.items.map((item) => {
+                          const isEditingCost = editingCostEventId === item.id;
+                          const isDeleting = deletingEventId === item.id;
+                          const itemCost = item.cost;
+                          const itemCurrency = itemCost?.currency_code ?? "MXN";
+                          const kindLabel = getProcessKindLabel(item.process_event_kind);
+                          const canDelete =
+                            !isArchived &&
+                            !item.is_process_header &&
+                            item.process_closed_event_id !== item.id;
 
-                    return (
-                      <article
-                        className={`timeline__item timeline__post ${item.is_process_header ? "timeline__item--process" : ""}`}
-                        key={item.id}
-                      >
-                        <div className="timeline__meta">
-                          <span>{item.time_kind === "scheduled" ? "Programado" : "Registrado"}</span>
-                          <span>{formatDate(item.event_at)}</span>
-                        </div>
-                        <div className="timeline__header">
-                          <div className="timeline__body">
-                            <div className="timeline__badge-row">
-                              {item.is_process_header ? (
-                                <span className="process-badge">Seguimiento especial</span>
-                              ) : null}
-                            <h3>{item.is_process_header ? item.process_title ?? item.title : item.title}</h3>
-                            {item.is_process_header && item.process_type_label ? (
-                              <p className="muted timeline__labels">
-                                Tipo: {item.process_type_label}
-                                {item.process_closed_at ? " · Cerrado" : " · Abierto"}
-                              </p>
-                            ) : null}
-                            {!item.is_process_header && kindLabel ? (
-                              <span className="process-chip">{kindLabel}</span>
-                            ) : null}
-                            </div>
-                          </div>
-                          {item.is_process_header ? (
-                            <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
-                              Abrir seguimiento
-                            </Link>
-                          ) : !isArchived ? (
-                            <div className="timeline__actions">
-                              <button
-                                className="button button--ghost button--small"
-                                type="button"
-                                onClick={() => {
-                                  setTimelineActionError(null);
-                                  setEditingCostError(null);
-                                  setEditingCostEventId((current) => (current === item.id ? null : item.id));
-                                }}
-                                disabled={isDeleting}
-                              >
-                                {isEditingCost
-                                  ? "Cerrar costo"
-                                  : itemCost && itemCost.mode !== "none"
-                                    ? "Editar costo"
-                                    : "Agregar costo"}
-                              </button>
-                              {canDelete ? (
-                                <button
-                                  className="button button--ghost button--danger button--small"
-                                  type="button"
-                                  onClick={() => handleDeleteEvent(item.id)}
-                                  disabled={voidEventMutation.isPending}
-                                >
-                                  {voidEventMutation.isPending && isDeleting ? "Eliminando..." : "Eliminar"}
-                                </button>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                        <p className="muted timeline__labels">
-                          {item.is_process_header
-                            ? `Seguimiento ligado al feed de ${cat.name}.`
-                            : [item.category_label, item.subcategory_label].filter(Boolean).join(" / ") ||
-                              "Sin categoria"}
-                        </p>
-                        {item.notes ? <p>{item.notes}</p> : null}
-                        {itemCost && itemCost.mode !== "none" && itemCost.cat_amount !== null ? (
-                          <p className="timeline__cost">
-                            {itemCost.mode === "shared_total" && itemCost.total_amount !== null
-                              ? `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil · total ${formatMoney(itemCost.total_amount, itemCurrency)}`
-                              : `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil`}
-                          </p>
-                        ) : null}
-                        {item.process_id && !item.is_process_header ? (
-                          <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
-                            Ver hilo: {item.process_title ?? "Proceso clinico"}
-                          </Link>
-                        ) : null}
-                        {isDeleting && timelineActionError ? (
-                          <p className="error">{timelineActionError}</p>
-                        ) : null}
-                        {isEditingCost ? (
-                          <form className="cost-editor" onSubmit={handleEditCostSubmit}>
-                            {eventCostDraftQuery.isLoading ? <p className="muted">Cargando costo...</p> : null}
-                            {eventCostDraftQuery.data ? (
-                              <>
-                                <div className="section-header section-header--compact">
-                                  <div>
-                                    <strong>Costo del evento</strong>
-                                    <p className="muted">
-                                      Se guarda separado y solo se refleja aqui de forma discreta.
-                                    </p>
-                                  </div>
-                                  <button
-                                    className="button button--secondary button--small"
-                                    type="button"
-                                    onClick={() => setEditingCostEnabled((current) => !current)}
-                                  >
-                                    {editingCostEnabled ? "Quitar" : "Agregar"}
-                                  </button>
+                          return (
+                            <article
+                              className={`timeline__item timeline__post ${item.is_process_header ? "timeline__item--process" : ""}`}
+                              key={item.id}
+                            >
+                              <div className="timeline-story">
+                                <div className="timeline-story__date">
+                                  <span className="timeline-story__day">{formatFeedDay(item.event_at)}</span>
+                                  <span className="timeline-story__month">{formatFeedMonth(item.event_at)}</span>
+                                  <span className="timeline-story__time">
+                                    {item.time_kind === "scheduled" ? "Programado" : "Registrado"}
+                                  </span>
                                 </div>
-                                {editingCostEnabled ? (
-                                  <div className="stack stack--compact">
-                                    <div className="field">
-                                      <label htmlFor={`timeline-cost-mode-${item.id}`}>Modo de costo</label>
-                                      <select
-                                        id={`timeline-cost-mode-${item.id}`}
-                                        value={editingCostMode}
-                                        onChange={(event) =>
-                                          setEditingCostMode(
-                                            event.target.value as "per_cat" | "shared_total",
-                                          )
-                                        }
+                                <div className="timeline-story__content">
+                              <div className="timeline__meta">
+                                <span>{formatDate(item.event_at)}</span>
+                              </div>
+                              <div className="timeline__header">
+                                <div className="timeline__body">
+                                  <div className="timeline__badge-row">
+                                    {item.is_process_header ? (
+                                      <span className="process-badge">Seguimiento especial</span>
+                                    ) : null}
+                                    <h3>{item.is_process_header ? item.process_title ?? item.title : item.title}</h3>
+                                    {item.is_process_header && item.process_type_label ? (
+                                      <p className="muted timeline__labels">
+                                        Tipo: {item.process_type_label}
+                                        {item.process_closed_at ? " · Cerrado" : " · Abierto"}
+                                      </p>
+                                    ) : null}
+                                    {!item.is_process_header && kindLabel ? (
+                                      <span className="process-chip">{kindLabel}</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                {item.is_process_header ? (
+                                  <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
+                                    Abrir seguimiento
+                                  </Link>
+                                ) : !isArchived ? (
+                                  <div className="timeline__actions">
+                                    <button
+                                      className="button button--ghost button--small"
+                                      type="button"
+                                      onClick={() => {
+                                        setTimelineActionError(null);
+                                        setEditingCostError(null);
+                                        setEditingCostEventId((current) => (current === item.id ? null : item.id));
+                                      }}
+                                      disabled={isDeleting}
+                                    >
+                                      {isEditingCost
+                                        ? "Cerrar costo"
+                                        : itemCost && itemCost.mode !== "none"
+                                          ? "Editar costo"
+                                          : "Agregar costo"}
+                                    </button>
+                                    {canDelete ? (
+                                      <button
+                                        className="button button--ghost button--danger button--small"
+                                        type="button"
+                                        onClick={() => handleDeleteEvent(item.id)}
+                                        disabled={voidEventMutation.isPending}
                                       >
-                                        <option value="shared_total">Total compartido</option>
-                                        <option value="per_cat">Monto por gato</option>
-                                      </select>
-                                    </div>
-                                    {editingCostMode === "shared_total" ? (
-                                      <div className="field">
-                                        <label htmlFor={`timeline-shared-total-${item.id}`}>
-                                          Total compartido
-                                        </label>
-                                        <input
-                                          id={`timeline-shared-total-${item.id}`}
-                                          inputMode="decimal"
-                                          placeholder="0.00"
-                                          value={editingSharedTotalAmount}
-                                          onChange={(event) => setEditingSharedTotalAmount(event.target.value)}
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div className="stack stack--compact">
-                                        {eventCostDraftQuery.data.cat_amounts.map((costItem) => (
-                                          <div className="field" key={costItem.cat_id}>
-                                            <label htmlFor={`timeline-cost-${item.id}-${costItem.cat_id}`}>
-                                              {costItem.cat_name}
-                                            </label>
-                                            <input
-                                              id={`timeline-cost-${item.id}-${costItem.cat_id}`}
-                                              inputMode="decimal"
-                                              placeholder="0.00"
-                                              value={editingPerCatAmounts[costItem.cat_id] ?? ""}
-                                              onChange={(event) =>
-                                                setEditingPerCatAmounts((current) => ({
-                                                  ...current,
-                                                  [costItem.cat_id]: event.target.value,
-                                                }))
-                                              }
-                                            />
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                                        {voidEventMutation.isPending && isDeleting ? "Eliminando..." : "Eliminar"}
+                                      </button>
+                                    ) : null}
                                   </div>
                                 ) : null}
-                              </>
-                            ) : null}
-                            {editingCostError ? <p className="error">{editingCostError}</p> : null}
-                            <div className="actions">
-                              <button
-                                className="button"
-                                type="submit"
-                                disabled={updateEventCostMutation.isPending || eventCostDraftQuery.isLoading}
-                              >
-                                {updateEventCostMutation.isPending ? "Guardando..." : "Guardar costo"}
-                              </button>
-                            </div>
-                          </form>
-                        ) : null}
-                      </article>
-                    );
-                  })}
+                              </div>
+                              <p className="muted timeline__labels">
+                                {item.is_process_header
+                                  ? `Seguimiento ligado al feed de ${cat.name}.`
+                                  : [item.category_label, item.subcategory_label].filter(Boolean).join(" / ") ||
+                                    "Sin categoria"}
+                              </p>
+                              {item.notes ? <p className="timeline__narrative">{item.notes}</p> : null}
+                              {itemCost && itemCost.mode !== "none" && itemCost.cat_amount !== null ? (
+                                <p className="timeline__cost">
+                                  {itemCost.mode === "shared_total" && itemCost.total_amount !== null
+                                    ? `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil · total ${formatMoney(itemCost.total_amount, itemCurrency)}`
+                                    : `${formatMoney(itemCost.cat_amount, itemCurrency)} para este perfil`}
+                                </p>
+                              ) : <span className="timeline__quiet">Sin costo visible</span>}
+                              {item.process_id && !item.is_process_header ? (
+                                <Link className="inline-link" to={`/cats/${cat.id}/processes/${item.process_id}`}>
+                                  Ver hilo: {item.process_title ?? "Proceso clinico"}
+                                </Link>
+                              ) : null}
+                              {isDeleting && timelineActionError ? (
+                                <p className="error">{timelineActionError}</p>
+                              ) : null}
+                                </div>
+                              </div>
+                              {isEditingCost ? (
+                                <form className="cost-editor" onSubmit={handleEditCostSubmit}>
+                                  {eventCostDraftQuery.isLoading ? <p className="muted">Cargando costo...</p> : null}
+                                  {eventCostDraftQuery.data ? (
+                                    <>
+                                      <div className="section-header section-header--compact">
+                                        <div>
+                                          <strong>Costo del evento</strong>
+                                          <p className="muted">
+                                            Se guarda separado y solo se refleja aqui de forma discreta.
+                                          </p>
+                                        </div>
+                                        <button
+                                          className="button button--secondary button--small"
+                                          type="button"
+                                          onClick={() => setEditingCostEnabled((current) => !current)}
+                                        >
+                                          {editingCostEnabled ? "Quitar" : "Agregar"}
+                                        </button>
+                                      </div>
+                                      {editingCostEnabled ? (
+                                        <div className="stack stack--compact">
+                                          <div className="field">
+                                            <label htmlFor={`timeline-cost-mode-${item.id}`}>Modo de costo</label>
+                                            <select
+                                              id={`timeline-cost-mode-${item.id}`}
+                                              value={editingCostMode}
+                                              onChange={(event) =>
+                                                setEditingCostMode(
+                                                  event.target.value as "per_cat" | "shared_total",
+                                                )
+                                              }
+                                            >
+                                              <option value="shared_total">Total compartido</option>
+                                              <option value="per_cat">Monto por gato</option>
+                                            </select>
+                                          </div>
+                                          {editingCostMode === "shared_total" ? (
+                                            <div className="field">
+                                              <label htmlFor={`timeline-shared-total-${item.id}`}>
+                                                Total compartido
+                                              </label>
+                                              <input
+                                                id={`timeline-shared-total-${item.id}`}
+                                                inputMode="decimal"
+                                                placeholder="0.00"
+                                                value={editingSharedTotalAmount}
+                                                onChange={(event) => setEditingSharedTotalAmount(event.target.value)}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <div className="stack stack--compact">
+                                              {eventCostDraftQuery.data.cat_amounts.map((costItem) => (
+                                                <div className="field" key={costItem.cat_id}>
+                                                  <label htmlFor={`timeline-cost-${item.id}-${costItem.cat_id}`}>
+                                                    {costItem.cat_name}
+                                                  </label>
+                                                  <input
+                                                    id={`timeline-cost-${item.id}-${costItem.cat_id}`}
+                                                    inputMode="decimal"
+                                                    placeholder="0.00"
+                                                    value={editingPerCatAmounts[costItem.cat_id] ?? ""}
+                                                    onChange={(event) =>
+                                                      setEditingPerCatAmounts((current) => ({
+                                                        ...current,
+                                                        [costItem.cat_id]: event.target.value,
+                                                      }))
+                                                    }
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </>
+                                  ) : null}
+                                  {editingCostError ? <p className="error">{editingCostError}</p> : null}
+                                  <div className="actions">
+                                    <button
+                                      className="button"
+                                      type="submit"
+                                      disabled={updateEventCostMutation.isPending || eventCostDraftQuery.isLoading}
+                                    >
+                                      {updateEventCostMutation.isPending ? "Guardando..." : "Guardar costo"}
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : null}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               )}
             </section>
